@@ -3,13 +3,19 @@ import { supabase } from '../supabase';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
-const Login = () => {
+const Login = ({ initialMode = 'LOGIN' }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [mode, setMode] = useState('LOGIN'); // 'LOGIN' or 'SIGNUP'
+    const [mode, setMode] = useState(initialMode); // 'LOGIN' or 'SIGNUP'
     const navigate = useNavigate();
+
+    // Update mode when prop changes (e.g. navigation)
+    React.useEffect(() => {
+        setMode(initialMode);
+        setError(null);
+    }, [initialMode]);
 
     const handleAuth = async (e) => {
         e.preventDefault();
@@ -21,12 +27,16 @@ const Login = () => {
                 const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
+                    options: {
+                        // Optional: Add default profile data here if needed, 
+                        // but our trigger handles creation usually.
+                    }
                 });
                 if (error) throw error;
-                // Auto login usually happens, or check email
+
                 if (data.user) {
                     alert("Signup successful! You can now login.");
-                    setMode('LOGIN');
+                    navigate('/login');
                 }
             } else {
                 const { data, error } = await supabase.auth.signInWithPassword({
@@ -108,14 +118,14 @@ const Login = () => {
                     {mode === 'LOGIN' ? (
                         <>
                             Don't have an account?{' '}
-                            <button onClick={() => setMode('SIGNUP')} className="text-blue-400 hover:text-blue-300 font-medium">
+                            <button onClick={() => navigate('/signup')} className="text-blue-400 hover:text-blue-300 font-medium">
                                 Sign Up
                             </button>
                         </>
                     ) : (
                         <>
                             Already have an account?{' '}
-                            <button onClick={() => setMode('LOGIN')} className="text-blue-400 hover:text-blue-300 font-medium">
+                            <button onClick={() => navigate('/login')} className="text-blue-400 hover:text-blue-300 font-medium">
                                 Sign In
                             </button>
                         </>

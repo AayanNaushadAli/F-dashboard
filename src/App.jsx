@@ -14,7 +14,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/market" element={<Market />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<Login initialMode="LOGIN" />} />
+            <Route path="/signup" element={<Login initialMode="SIGNUP" />} />
             <Route path="/profile" element={<Profile />} />
           </Routes>
         </BrowserRouter>
