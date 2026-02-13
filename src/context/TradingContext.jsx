@@ -1,9 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabase';
-
-const TradingContext = createContext();
-
-export const useTrading = () => useContext(TradingContext);
+import { TradingContext } from './TradingContextCore';
 
 export const TradingProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -14,35 +11,29 @@ export const TradingProvider = ({ children }) => {
     const [ticker24h, setTicker24h] = useState({ change: 0, high: 0, low: 0, vol: 0 });
     const ws = useRef(null);
 
-    // New States for Market Sentiment
     const [marketSentiment, setMarketSentiment] = useState(null);
     const [newsSentiment, setNewsSentiment] = useState(null);
 
-    // Fetch Market Data (Fear/Greed & News)
     const fetchMarketData = async () => {
         try {
-            // 1. Fear & Greed Index
             const fgRes = await fetch('https://api.alternative.me/fng/?limit=1');
             const fgData = await fgRes.json();
             setMarketSentiment(fgData.data[0]);
 
-            // 2. News & Sentiment Analysis
             const newsRes = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN');
             const newsData = await newsRes.json();
 
             if (newsData.Data && newsData.Data.length > 0) {
-                // Simple Keyword Sentiment Analysis
                 const positiveWords = ['bull', 'surge', 'gain', 'adoption', 'record', 'high', 'approve', 'etf', 'launch', 'growth'];
                 const negativeWords = ['bear', 'crash', 'ban', 'hack', 'drop', 'low', 'reject', 'sec', 'fraud', 'collapse'];
 
                 let score = 0;
                 let count = 0;
 
-                // Analyze last 50 headlines
                 newsData.Data.slice(0, 50).forEach(article => {
                     const title = article.title.toLowerCase();
                     const body = article.body.toLowerCase();
-                    const text = title + " " + body;
+                    const text = `${title} ${body}`;
 
                     let articleScore = 0;
                     positiveWords.forEach(word => { if (text.includes(word)) articleScore++; });
@@ -54,7 +45,6 @@ export const TradingProvider = ({ children }) => {
                     }
                 });
 
-                // Normalize score (-1 to 1)
                 const normalizedScore = count > 0 ? (score / count).toFixed(2) : 0;
                 setNewsSentiment({
                     score: normalizedScore,
@@ -62,17 +52,15 @@ export const TradingProvider = ({ children }) => {
                     analyzedCount: count
                 });
             }
-
         } catch (error) {
-            console.error("Error fetching market data:", error);
+            console.error('Error fetching market data:', error);
         }
     };
 
     const fetchData = async (userId) => {
         if (!userId) return;
         try {
-            // Fetch Profile
-            let { data: profileData, error: profileError } = await supabase
+            const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
@@ -84,7 +72,6 @@ export const TradingProvider = ({ children }) => {
             }
             setProfile(profileData);
 
-            // Fetch Active Positions
             const { data: posData } = await supabase
                 .from('positions')
                 .select('*')
@@ -92,7 +79,6 @@ export const TradingProvider = ({ children }) => {
                 .order('created_at', { ascending: false });
             setPositions(posData || []);
 
-            // Fetch History
             const { data: histData } = await supabase
                 .from('trade_history')
                 .select('*')
@@ -100,18 +86,14 @@ export const TradingProvider = ({ children }) => {
                 .order('closed_at', { ascending: false })
                 .limit(50);
             setHistory(histData || []);
-
         } catch (error) {
             console.error('Error in fetchData:', error);
         }
     };
 
-    // 1. Auth & Initial Data Fetch
     useEffect(() => {
-        // Fetch non-user specific data immediately
         fetchMarketData();
 
-        // Check active session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setUser(session?.user ?? null);
             if (session?.user) fetchData(session.user.id);
@@ -130,7 +112,6 @@ export const TradingProvider = ({ children }) => {
         return () => subscription.unsubscribe();
     }, []);
 
-    // 2. Real-time Price Feed (Binance WebSocket)
     useEffect(() => {
         ws.current = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
 
@@ -153,58 +134,64 @@ export const TradingProvider = ({ children }) => {
         };
     }, []);
 
-    // Helper to check triggers (Simplified for now)
-    const checkTriggers = async (price) => {
-        // Implement TP/SL logic here later
+    const checkTriggers = async () => {
+        // TODO: Implement TP/SL logic
     };
 
-    // Effect to check triggers on price update
     useEffect(() => {
         if (currentPrice && positions.length > 0) {
-            checkTriggers(currentPrice);
+            checkTriggers();
         }
     }, [currentPrice, positions]);
 
-    // 3. Trade Actions
     const placeOrder = async (order) => {
-        if (!user || !profile) throw new Error("Please login to trade");
+        if (!user || !profile) throw new Error('Please login to trade');
 
-        // 1. Calculate Margin & Fees
-        const margin = parseFloat(order.amount);
-        const fee = margin * 0.001; // 0.1% fee
+        const parsedAmount = Number(order.amount);
+        const parsedLeverage = Number(order.leverage);
+        const safePrice = Number(currentPrice);
+
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+            throw new Error('Invalid order amount');
+        }
+        if (!Number.isFinite(parsedLeverage) || parsedLeverage < 1 || parsedLeverage > 50) {
+            throw new Error('Leverage must be between 1 and 50');
+        }
+        if (!Number.isFinite(safePrice) || safePrice <= 0) {
+            throw new Error('Market price unavailable');
+        }
+
+        const margin = parsedAmount;
+        const fee = margin * 0.001;
         const cost = margin + fee;
 
-        if (profile.balance < cost) throw new Error("Insufficient Balance");
+        if (Number(profile.balance) < cost) throw new Error('Insufficient Balance');
 
-        // 2. Calculate Liquidation Price
-        const sideMulti = order.side === 'LONG' ? 1 : -1;
         const liqPrice = order.side === 'LONG'
-            ? currentPrice * (1 - 1 / order.leverage + 0.005) // Buffer
-            : currentPrice * (1 + 1 / order.leverage - 0.005);
+            ? safePrice * (1 - 1 / parsedLeverage + 0.005)
+            : safePrice * (1 + 1 / parsedLeverage - 0.005);
 
         const newPosition = {
             user_id: user.id,
             symbol: 'BTCUSDT',
             side: order.side,
-            entry_price: currentPrice,
-            size: margin * order.leverage,
-            leverage: order.leverage,
-            margin: margin,
+            entry_price: safePrice,
+            size: margin * parsedLeverage,
+            leverage: parsedLeverage,
+            margin,
             liquidation_price: liqPrice,
             take_profit: order.tp || null,
             stop_loss: order.sl || null
         };
 
-        // 3. Transaction: Deduct Balance & Insert Position
-        // A. Deduct Balance
+        const previousBalance = Number(profile.balance);
         const { error: balError } = await supabase
             .from('profiles')
-            .update({ balance: profile.balance - cost })
+            .update({ balance: previousBalance - cost })
             .eq('id', user.id);
 
         if (balError) throw balError;
 
-        // B. Insert Position
         const { data: posData, error: posError } = await supabase
             .from('positions')
             .insert([newPosition])
@@ -212,56 +199,63 @@ export const TradingProvider = ({ children }) => {
             .single();
 
         if (posError) {
-            // Rollback balance (manual)
-            await supabase.from('profiles').update({ balance: profile.balance }).eq('id', user.id);
+            await supabase.from('profiles').update({ balance: previousBalance }).eq('id', user.id);
             throw posError;
         }
 
-        // Refresh State
-        fetchData(user.id);
+        await fetchData(user.id);
         return posData;
     };
 
     const closePosition = async (position) => {
         if (!user) return;
 
-        const quantity = position.size / position.entry_price;
+        const quantity = Number(position.size) / Number(position.entry_price);
         let pnl = 0;
         if (position.side === 'LONG') {
-            pnl = (currentPrice - position.entry_price) * quantity;
+            pnl = (Number(currentPrice) - Number(position.entry_price)) * quantity;
         } else {
-            pnl = (position.entry_price - currentPrice) * quantity;
+            pnl = (Number(position.entry_price) - Number(currentPrice)) * quantity;
         }
 
-        const roi = (pnl / position.margin) * 100;
-        const returnAmount = position.margin + pnl;
+        const roi = (pnl / Number(position.margin)) * 100;
+        const returnAmount = Number(position.margin) + pnl;
 
-        // 1. Delete Position
         const { error: delError } = await supabase.from('positions').delete().eq('id', position.id);
         if (delError) throw delError;
 
-        // 2. Add to History
         const historyEntry = {
             user_id: user.id,
             symbol: position.symbol,
             side: position.side,
             entry_price: position.entry_price,
             exit_price: currentPrice,
-            pnl: pnl,
-            roi: roi,
-            closed_at: new Date()
+            pnl,
+            roi,
+            closed_at: new Date().toISOString()
         };
-        await supabase.from('trade_history').insert([historyEntry]);
 
-        // 3. Update Balance
-        const { data: latestProfile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-        if (latestProfile) {
-            await supabase.from('profiles').update({
+        const { error: historyError } = await supabase.from('trade_history').insert([historyEntry]);
+        if (historyError) throw historyError;
+
+        const { data: latestProfile, error: latestProfileError } = await supabase
+            .from('profiles')
+            .select('balance')
+            .eq('id', user.id)
+            .single();
+
+        if (latestProfileError) throw latestProfileError;
+
+        const { error: balanceError } = await supabase
+            .from('profiles')
+            .update({
                 balance: Number(latestProfile.balance) + Number(returnAmount)
-            }).eq('id', user.id);
-        }
+            })
+            .eq('id', user.id);
 
-        fetchData(user.id);
+        if (balanceError) throw balanceError;
+
+        await fetchData(user.id);
     };
 
     const value = {

@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Activity, Brain, Newspaper, Wallet, ArrowUpRight, LogIn, LogOut, User } from 'lucide-react';
-import { useTrading } from '../context/TradingContext';
+import { useTrading } from '../context/useTrading';
 import { supabase } from '../supabase';
 
 const Dashboard = () => {
     const { user, profile, history, marketSentiment, newsSentiment } = useTrading();
     const navigate = useNavigate();
-    const [chartData, setChartData] = useState([]);
     const [timeframe, setTimeframe] = useState('1M');
 
     // Calculate Stats
@@ -26,51 +25,42 @@ const Dashboard = () => {
         return { dailyPnL, winRate, wins, total };
     }, [history]);
 
-    useEffect(() => {
-        if (!profile || !history) return;
+    const chartData = useMemo(() => {
+        if (!profile || !history) return [];
 
-        // Determine days based on timeframe
         let daysCount = 30;
         if (timeframe === '1W') daysCount = 7;
         if (timeframe === '3M') daysCount = 90;
-        if (timeframe === 'ALL') daysCount = 365; // Approximate for now
+        if (timeframe === 'ALL') daysCount = 365;
 
-        // Generate dates
         const days = [];
         for (let i = daysCount - 1; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            days.push(d.toISOString().split('T')[0]); // YYYY-MM-DD
+            days.push(d.toISOString().split('T')[0]);
         }
 
-        // Group PnL by Day
         const pnlByDay = {};
-        history.forEach(trade => {
+        history.forEach((trade) => {
             const date = new Date(trade.closed_at).toISOString().split('T')[0];
             pnlByDay[date] = (pnlByDay[date] || 0) + parseFloat(trade.pnl);
         });
 
-        // Calculate Cumulative Balance
-        // We need to start from valid point. 
-        // Logic: Start Balance + Sum of PnL BEFORE the first day of chart
-
         const startDate = days[0];
-        const preHistory = history.filter(t => new Date(t.closed_at).toISOString().split('T')[0] < startDate);
+        const preHistory = history.filter((t) => new Date(t.closed_at).toISOString().split('T')[0] < startDate);
         const prePnL = preHistory.reduce((acc, t) => acc + parseFloat(t.pnl), 0);
 
         let currentBalance = parseFloat(profile.start_balance || 10000) + prePnL;
 
-        const data = days.map(day => {
+        return days.map((day) => {
             if (pnlByDay[day]) {
                 currentBalance += pnlByDay[day];
             }
             return {
-                day: day.slice(5), // MM-DD
+                day: day.slice(5),
                 balance: parseFloat(currentBalance.toFixed(2))
             };
         });
-
-        setChartData(data);
     }, [profile, history, timeframe]);
 
     const handleLogout = async () => {

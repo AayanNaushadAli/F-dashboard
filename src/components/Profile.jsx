@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { useTrading } from '../context/TradingContext';
+import { useTrading } from '../context/useTrading';
 import { ArrowLeft, Save, User, Mail, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 

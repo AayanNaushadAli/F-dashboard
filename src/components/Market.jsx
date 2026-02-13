@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ArrowLeft, Wallet, TrendingUp, TrendingDown, Clock, AlertCircle, XCircle, GripHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useTrading } from '../context/TradingContext';
+import { useTrading } from '../context/useTrading';
 
 const Market = () => {
-  const { user, profile, currentPrice, ticker24h, placeOrder, positions, closePosition } = useTrading();
+  const { profile, currentPrice, ticker24h, placeOrder, positions, closePosition } = useTrading();
   const container = useRef();
 
   // Form State
