@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useTrading } from '../context/useTrading';
 
 const Market = () => {
-  const { profile, currentPrice, ticker24h, placeOrder, positions, pendingOrders, closePosition, closePositionPartial, updatePositionRisk, cancelPendingOrder } = useTrading();
+  const { profile, currentPrice, ticker24h, placeOrder, positions, pendingOrders, history, closePosition, closePositionPartial, updatePositionRisk, cancelPendingOrder } = useTrading();
   const container = useRef();
 
   const [orderType, setOrderType] = useState('MARKET');
@@ -16,6 +16,7 @@ const Market = () => {
   const [sl, setSl] = useState('');
   const [trailingEnabled, setTrailingEnabled] = useState(false);
   const [trailingPercent, setTrailingPercent] = useState('1');
+  const [reduceOnly, setReduceOnly] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rowRisk, setRowRisk] = useState({});
   const [error, setError] = useState(null);
@@ -87,7 +88,8 @@ const Market = () => {
         tp: tp ? parseFloat(tp) : null,
         sl: sl ? parseFloat(sl) : null,
         trailingEnabled,
-        trailingPercent: trailingEnabled ? parseFloat(trailingPercent) : null
+        trailingPercent: trailingEnabled ? parseFloat(trailingPercent) : null,
+        reduceOnly
       });
       setTriggerPrice('');
     } catch (err) {
@@ -248,11 +250,25 @@ const Market = () => {
                       <div>
                         <span className="text-blue-300">{o.order_type}</span> {o.side} @ <span className="font-mono">{Number(o.trigger_price).toFixed(2)}</span>
                         <span className="text-slate-500 ml-2">{o.leverage}x • ${Number(o.margin).toFixed(2)}</span>
+                        {o.reduce_only ? <span className="ml-2 text-amber-300">Reduce-Only</span> : null}
                       </div>
                       <button onClick={() => cancelPendingOrder(o.id)} className="text-red-400 hover:text-red-300">Cancel</button>
                     </div>
                   ))}
                   {pendingOrders.length === 0 && <div className="text-slate-500 text-xs">No pending orders</div>}
+                </div>
+
+                <div className="mt-4 border-t border-slate-800 pt-3">
+                  <div className="text-xs text-slate-400 mb-2">Recent Fills</div>
+                  <div className="space-y-1">
+                    {(history || []).slice(0, 8).map((h) => (
+                      <div key={h.id} className="text-[11px] text-slate-300 flex justify-between bg-slate-800/30 px-2 py-1 rounded">
+                        <span>{h.side} {h.symbol}</span>
+                        <span className={Number(h.pnl) >= 0 ? 'text-emerald-400' : 'text-red-400'}>{Number(h.pnl) >= 0 ? '+' : ''}{Number(h.pnl).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    {(!history || history.length === 0) && <div className="text-slate-500 text-xs">No fills yet</div>}
+                  </div>
                 </div>
               </div>
             </div>
@@ -319,6 +335,11 @@ const Market = () => {
                 <span className="text-slate-500">%</span>
               </div>
             </div>
+
+            <label className="text-slate-400 flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} />
+              Reduce-Only (won't open opposite new exposure)
+            </label>
 
             <div className="flex justify-between text-xs">
               <span className="text-slate-500 flex items-center gap-1"><Wallet size={12} /> Avail</span>

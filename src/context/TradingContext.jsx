@@ -133,6 +133,7 @@ export const TradingProvider = ({ children }) => {
         const parsedAmount = Number(order.amount);
         const parsedLeverage = Number(order.leverage);
         const safePrice = Number(currentPrice);
+        const reduceOnly = Boolean(order.reduceOnly);
 
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) throw new Error('Invalid order amount');
         if (!Number.isFinite(parsedLeverage) || parsedLeverage < 1 || parsedLeverage > 50) throw new Error('Leverage must be between 1 and 50');
@@ -150,6 +151,26 @@ export const TradingProvider = ({ children }) => {
         }
 
         if (order.type === 'MARKET') {
+            if (reduceOnly) {
+                let remaining = parsedAmount;
+                const reducible = positions.filter((p) => p.symbol === 'BTCUSDT' && p.side !== order.side);
+                for (const pos of reducible) {
+                    if (remaining <= 0) break;
+                    const posMargin = Number(pos.margin);
+                    const pct = Math.min(100, (remaining / posMargin) * 100);
+                    const { error: reduceErr } = await supabase.rpc('close_position_partial_tx', {
+                        p_user_id: user.id,
+                        p_position_id: pos.id,
+                        p_exit_price: safePrice,
+                        p_close_percent: pct
+                    });
+                    if (reduceErr) throw reduceErr;
+                    remaining -= Math.min(remaining, posMargin);
+                }
+                await fetchData(user.id);
+                return { reduced: true };
+            }
+
             const { data, error } = await supabase.rpc('open_position_tx', {
                 p_user_id: user.id,
                 p_symbol: 'BTCUSDT',
@@ -194,7 +215,8 @@ export const TradingProvider = ({ children }) => {
                 take_profit: safeTp,
                 stop_loss: safeSl,
                 trailing_sl_enabled: trailingEnabled,
-                trailing_sl_percent: trailingEnabled ? trailingPercent : null
+                trailing_sl_percent: trailingEnabled ? trailingPercent : null,
+                reduce_only: reduceOnly
             }])
             .select()
             .single();
@@ -323,28 +345,47 @@ export const TradingProvider = ({ children }) => {
                 }
 
                 if (shouldOpen) {
-                    const { data: openedPos, error: openErr } = await supabase.rpc('open_position_tx', {
-                        p_user_id: user.id,
-                        p_symbol: o.symbol,
-                        p_side: o.side,
-                        p_entry_price: Number(currentPrice),
-                        p_margin: Number(o.margin),
-                        p_leverage: Number(o.leverage),
-                        p_take_profit: o.take_profit,
-                        p_stop_loss: o.stop_loss
-                    });
-                    if (!openErr) {
-                        if (openedPos?.id && o.trailing_sl_enabled && o.trailing_sl_percent) {
-                            await supabase.rpc('update_position_risk', {
+                    if (o.reduce_only) {
+                        let remaining = Number(o.margin);
+                        const reducible = positions.filter((p) => p.symbol === o.symbol && p.side !== o.side);
+                        for (const pos of reducible) {
+                            if (remaining <= 0) break;
+                            const posMargin = Number(pos.margin);
+                            const pct = Math.min(100, (remaining / posMargin) * 100);
+                            const { error: reduceErr } = await supabase.rpc('close_position_partial_tx', {
                                 p_user_id: user.id,
-                                p_position_id: openedPos.id,
-                                p_take_profit: o.take_profit,
-                                p_stop_loss: o.stop_loss,
-                                p_trailing_sl_enabled: true,
-                                p_trailing_sl_percent: Number(o.trailing_sl_percent)
+                                p_position_id: pos.id,
+                                p_exit_price: Number(currentPrice),
+                                p_close_percent: pct
                             });
+                            if (reduceErr) break;
+                            remaining -= Math.min(remaining, posMargin);
                         }
                         await supabase.from('pending_orders').delete().eq('id', o.id).eq('user_id', user.id);
+                    } else {
+                        const { data: openedPos, error: openErr } = await supabase.rpc('open_position_tx', {
+                            p_user_id: user.id,
+                            p_symbol: o.symbol,
+                            p_side: o.side,
+                            p_entry_price: Number(currentPrice),
+                            p_margin: Number(o.margin),
+                            p_leverage: Number(o.leverage),
+                            p_take_profit: o.take_profit,
+                            p_stop_loss: o.stop_loss
+                        });
+                        if (!openErr) {
+                            if (openedPos?.id && o.trailing_sl_enabled && o.trailing_sl_percent) {
+                                await supabase.rpc('update_position_risk', {
+                                    p_user_id: user.id,
+                                    p_position_id: openedPos.id,
+                                    p_take_profit: o.take_profit,
+                                    p_stop_loss: o.stop_loss,
+                                    p_trailing_sl_enabled: true,
+                                    p_trailing_sl_percent: Number(o.trailing_sl_percent)
+                                });
+                            }
+                            await supabase.from('pending_orders').delete().eq('id', o.id).eq('user_id', user.id);
+                        }
                     }
                 }
             }
