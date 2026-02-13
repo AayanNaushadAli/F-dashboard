@@ -12,6 +12,7 @@ export const TradingProvider = ({ children }) => {
     const [ticker24h, setTicker24h] = useState({ change: 0, high: 0, low: 0, vol: 0 });
     const ws = useRef(null);
     const checkingRef = useRef(false);
+    const trailAnchorsRef = useRef({});
 
     const [marketSentiment, setMarketSentiment] = useState(null);
     const [newsSentiment, setNewsSentiment] = useState(null);
@@ -139,9 +140,14 @@ export const TradingProvider = ({ children }) => {
 
         const safeTp = order.tp ? Number(order.tp) : null;
         const safeSl = order.sl ? Number(order.sl) : null;
+        const trailingEnabled = Boolean(order.trailingEnabled);
+        const trailingPercent = trailingEnabled ? Number(order.trailingPercent) : null;
 
         if (safeTp !== null && (!Number.isFinite(safeTp) || safeTp <= 0)) throw new Error('Invalid TP');
         if (safeSl !== null && (!Number.isFinite(safeSl) || safeSl <= 0)) throw new Error('Invalid SL');
+        if (trailingEnabled && (!Number.isFinite(trailingPercent) || trailingPercent <= 0 || trailingPercent > 50)) {
+            throw new Error('Invalid trailing SL %');
+        }
 
         if (order.type === 'MARKET') {
             const { data, error } = await supabase.rpc('open_position_tx', {
@@ -155,6 +161,19 @@ export const TradingProvider = ({ children }) => {
                 p_stop_loss: safeSl
             });
             if (error) throw error;
+
+            if (data?.id && trailingEnabled) {
+                const { error: riskErr } = await supabase.rpc('update_position_risk', {
+                    p_user_id: user.id,
+                    p_position_id: data.id,
+                    p_take_profit: safeTp,
+                    p_stop_loss: safeSl,
+                    p_trailing_sl_enabled: true,
+                    p_trailing_sl_percent: trailingPercent
+                });
+                if (riskErr) throw riskErr;
+            }
+
             await fetchData(user.id);
             return data;
         }
@@ -173,7 +192,9 @@ export const TradingProvider = ({ children }) => {
                 margin: parsedAmount,
                 leverage: parsedLeverage,
                 take_profit: safeTp,
-                stop_loss: safeSl
+                stop_loss: safeSl,
+                trailing_sl_enabled: trailingEnabled,
+                trailing_sl_percent: trailingEnabled ? trailingPercent : null
             }])
             .select()
             .single();
@@ -197,6 +218,46 @@ export const TradingProvider = ({ children }) => {
         await fetchData(user.id);
     };
 
+    const closePositionPartial = async (position, closePercent) => {
+        if (!user) return;
+        const exitPrice = Number(currentPrice);
+        const pct = Number(closePercent);
+        if (!Number.isFinite(exitPrice) || exitPrice <= 0) throw new Error('Market price unavailable');
+        if (!Number.isFinite(pct) || pct <= 0 || pct > 100) throw new Error('Invalid close %');
+
+        const { error } = await supabase.rpc('close_position_partial_tx', {
+            p_user_id: user.id,
+            p_position_id: position.id,
+            p_exit_price: exitPrice,
+            p_close_percent: pct
+        });
+        if (error) throw error;
+        await fetchData(user.id);
+    };
+
+    const updatePositionRisk = async (positionId, { takeProfit, stopLoss, trailingEnabled, trailingPercent }) => {
+        if (!user) return;
+        const tp = takeProfit ? Number(takeProfit) : null;
+        const sl = stopLoss ? Number(stopLoss) : null;
+        const te = Boolean(trailingEnabled);
+        const tpct = te ? Number(trailingPercent) : null;
+
+        if (tp !== null && (!Number.isFinite(tp) || tp <= 0)) throw new Error('Invalid TP');
+        if (sl !== null && (!Number.isFinite(sl) || sl <= 0)) throw new Error('Invalid SL');
+        if (te && (!Number.isFinite(tpct) || tpct <= 0 || tpct > 50)) throw new Error('Invalid trailing %');
+
+        const { error } = await supabase.rpc('update_position_risk', {
+            p_user_id: user.id,
+            p_position_id: positionId,
+            p_take_profit: tp,
+            p_stop_loss: sl,
+            p_trailing_sl_enabled: te,
+            p_trailing_sl_percent: tpct
+        });
+        if (error) throw error;
+        await fetchData(user.id);
+    };
+
     const cancelPendingOrder = async (orderId) => {
         if (!user) return;
         const { error } = await supabase.from('pending_orders').delete().eq('id', orderId).eq('user_id', user.id);
@@ -211,22 +272,40 @@ export const TradingProvider = ({ children }) => {
             for (const pos of positions) {
                 const tp = pos.take_profit ? Number(pos.take_profit) : null;
                 const sl = pos.stop_loss ? Number(pos.stop_loss) : null;
-                let hit = false;
+                const trailingEnabled = Boolean(pos.trailing_sl_enabled);
+                const trailingPercent = pos.trailing_sl_percent ? Number(pos.trailing_sl_percent) : null;
+                const price = Number(currentPrice);
 
+                let effectiveSl = sl;
+                if (trailingEnabled && trailingPercent) {
+                    const prevAnchor = trailAnchorsRef.current[pos.id] ?? Number(pos.entry_price);
+                    const anchor = pos.side === 'LONG' ? Math.max(prevAnchor, price) : Math.min(prevAnchor, price);
+                    trailAnchorsRef.current[pos.id] = anchor;
+
+                    const trailStop = pos.side === 'LONG'
+                        ? anchor * (1 - trailingPercent / 100)
+                        : anchor * (1 + trailingPercent / 100);
+
+                    if (effectiveSl == null) effectiveSl = trailStop;
+                    else effectiveSl = pos.side === 'LONG' ? Math.max(effectiveSl, trailStop) : Math.min(effectiveSl, trailStop);
+                }
+
+                let hit = false;
                 if (pos.side === 'LONG') {
-                    if (tp && Number(currentPrice) >= tp) hit = true;
-                    if (sl && Number(currentPrice) <= sl) hit = true;
+                    if (tp && price >= tp) hit = true;
+                    if (effectiveSl && price <= effectiveSl) hit = true;
                 } else {
-                    if (tp && Number(currentPrice) <= tp) hit = true;
-                    if (sl && Number(currentPrice) >= sl) hit = true;
+                    if (tp && price <= tp) hit = true;
+                    if (effectiveSl && price >= effectiveSl) hit = true;
                 }
 
                 if (hit) {
                     await supabase.rpc('close_position_tx', {
                         p_user_id: user.id,
                         p_position_id: pos.id,
-                        p_exit_price: Number(currentPrice)
+                        p_exit_price: price
                     });
+                    delete trailAnchorsRef.current[pos.id];
                 }
             }
 
@@ -244,7 +323,7 @@ export const TradingProvider = ({ children }) => {
                 }
 
                 if (shouldOpen) {
-                    const { error: openErr } = await supabase.rpc('open_position_tx', {
+                    const { data: openedPos, error: openErr } = await supabase.rpc('open_position_tx', {
                         p_user_id: user.id,
                         p_symbol: o.symbol,
                         p_side: o.side,
@@ -255,6 +334,16 @@ export const TradingProvider = ({ children }) => {
                         p_stop_loss: o.stop_loss
                     });
                     if (!openErr) {
+                        if (openedPos?.id && o.trailing_sl_enabled && o.trailing_sl_percent) {
+                            await supabase.rpc('update_position_risk', {
+                                p_user_id: user.id,
+                                p_position_id: openedPos.id,
+                                p_take_profit: o.take_profit,
+                                p_stop_loss: o.stop_loss,
+                                p_trailing_sl_enabled: true,
+                                p_trailing_sl_percent: Number(o.trailing_sl_percent)
+                            });
+                        }
                         await supabase.from('pending_orders').delete().eq('id', o.id).eq('user_id', user.id);
                     }
                 }
@@ -284,6 +373,8 @@ export const TradingProvider = ({ children }) => {
         ticker24h,
         placeOrder,
         closePosition,
+        closePositionPartial,
+        updatePositionRisk,
         cancelPendingOrder,
         fetchData,
         marketSentiment,

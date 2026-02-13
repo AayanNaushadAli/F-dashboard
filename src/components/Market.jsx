@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useTrading } from '../context/useTrading';
 
 const Market = () => {
-  const { profile, currentPrice, ticker24h, placeOrder, positions, pendingOrders, closePosition, cancelPendingOrder } = useTrading();
+  const { profile, currentPrice, ticker24h, placeOrder, positions, pendingOrders, closePosition, closePositionPartial, updatePositionRisk, cancelPendingOrder } = useTrading();
   const container = useRef();
 
   const [orderType, setOrderType] = useState('MARKET');
@@ -14,7 +14,10 @@ const Market = () => {
   const [triggerPrice, setTriggerPrice] = useState('');
   const [tp, setTp] = useState('');
   const [sl, setSl] = useState('');
+  const [trailingEnabled, setTrailingEnabled] = useState(false);
+  const [trailingPercent, setTrailingPercent] = useState('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rowRisk, setRowRisk] = useState({});
   const [error, setError] = useState(null);
 
   const [positionsHeight, setPositionsHeight] = useState(256);
@@ -82,7 +85,9 @@ const Market = () => {
         type: orderType,
         triggerPrice: orderType === 'MARKET' ? null : parseFloat(triggerPrice),
         tp: tp ? parseFloat(tp) : null,
-        sl: sl ? parseFloat(sl) : null
+        sl: sl ? parseFloat(sl) : null,
+        trailingEnabled,
+        trailingPercent: trailingEnabled ? parseFloat(trailingPercent) : null
       });
       setTriggerPrice('');
     } catch (err) {
@@ -96,6 +101,27 @@ const Market = () => {
     const quantity = pos.size / pos.entry_price;
     if (pos.side === 'LONG') return (currentPrice - pos.entry_price) * quantity;
     return (pos.entry_price - currentPrice) * quantity;
+  };
+
+  const getRiskDraft = (pos) => rowRisk[pos.id] || {
+    tp: pos.take_profit ? String(pos.take_profit) : '',
+    sl: pos.stop_loss ? String(pos.stop_loss) : '',
+    trailingEnabled: Boolean(pos.trailing_sl_enabled),
+    trailingPercent: pos.trailing_sl_percent ? String(pos.trailing_sl_percent) : '1'
+  };
+
+  const onRiskDraftChange = (posId, patch) => {
+    setRowRisk((prev) => ({ ...prev, [posId]: { ...(prev[posId] || {}), ...patch } }));
+  };
+
+  const saveRisk = async (pos) => {
+    const draft = getRiskDraft(pos);
+    await updatePositionRisk(pos.id, {
+      takeProfit: draft.tp ? Number(draft.tp) : null,
+      stopLoss: draft.sl ? Number(draft.sl) : null,
+      trailingEnabled: draft.trailingEnabled,
+      trailingPercent: draft.trailingEnabled ? Number(draft.trailingPercent) : null
+    });
   };
 
   return (
@@ -146,9 +172,9 @@ const Market = () => {
                     <th className="px-4 py-2">Symbol</th>
                     <th className="px-4 py-2">Entry</th>
                     <th className="px-4 py-2">Mark</th>
-                    <th className="px-4 py-2">TP / SL</th>
+                    <th className="px-4 py-2">Risk Controls</th>
                     <th className="px-4 py-2">PnL</th>
-                    <th className="px-4 py-2 text-right">Action</th>
+                    <th className="px-4 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -162,15 +188,50 @@ const Market = () => {
                         </td>
                         <td className="px-4 py-3 font-mono">${Number(pos.entry_price).toLocaleString()}</td>
                         <td className="px-4 py-3 font-mono">${Number(currentPrice).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-slate-400 font-mono">
-                          TP: {pos.take_profit ? Number(pos.take_profit).toLocaleString() : '-'} / SL: {pos.stop_loss ? Number(pos.stop_loss).toLocaleString() : '-'}
+                        <td className="px-4 py-3 text-slate-300">
+                          <div className="grid grid-cols-2 gap-1 mb-1">
+                            <input
+                              type="number"
+                              value={getRiskDraft(pos).tp}
+                              onChange={(e) => onRiskDraftChange(pos.id, { tp: e.target.value })}
+                              placeholder="TP"
+                              className="bg-slate-950 border border-slate-700 rounded px-2 py-1 w-24"
+                            />
+                            <input
+                              type="number"
+                              value={getRiskDraft(pos).sl}
+                              onChange={(e) => onRiskDraftChange(pos.id, { sl: e.target.value })}
+                              placeholder="SL"
+                              className="bg-slate-950 border border-slate-700 rounded px-2 py-1 w-24"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <label className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(getRiskDraft(pos).trailingEnabled)}
+                                onChange={(e) => onRiskDraftChange(pos.id, { trailingEnabled: e.target.checked })}
+                              /> Trail
+                            </label>
+                            <input
+                              type="number"
+                              value={getRiskDraft(pos).trailingPercent}
+                              onChange={(e) => onRiskDraftChange(pos.id, { trailingPercent: e.target.value })}
+                              className="bg-slate-950 border border-slate-700 rounded px-2 py-1 w-16"
+                              disabled={!getRiskDraft(pos).trailingEnabled}
+                            />
+                            <span>%</span>
+                            <button onClick={() => saveRisk(pos)} className="text-blue-400 hover:text-blue-300">Save</button>
+                          </div>
                         </td>
                         <td className="px-4 py-3 font-mono">
                           <span className={pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}</span>
                           <span className={`ml-1 text-[10px] ${roe >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>({roe.toFixed(2)}%)</span>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <button onClick={() => closePosition(pos)} className="text-slate-300 hover:text-white">Close</button>
+                        <td className="px-4 py-3 text-right space-x-2">
+                          <button onClick={() => closePositionPartial(pos, 25)} className="text-slate-400 hover:text-white">25%</button>
+                          <button onClick={() => closePositionPartial(pos, 50)} className="text-slate-300 hover:text-white">50%</button>
+                          <button onClick={() => closePosition(pos)} className="text-red-300 hover:text-red-200">100%</button>
                         </td>
                       </tr>
                     );
@@ -239,6 +300,23 @@ const Market = () => {
               <div className="space-y-1">
                 <label className="text-xs text-slate-500">Stop Loss (optional)</label>
                 <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm" />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <label className="text-slate-400 flex items-center gap-2">
+                <input type="checkbox" checked={trailingEnabled} onChange={(e) => setTrailingEnabled(e.target.checked)} />
+                Enable Trailing SL
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={trailingPercent}
+                  onChange={(e) => setTrailingPercent(e.target.value)}
+                  disabled={!trailingEnabled}
+                  className="w-16 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm"
+                />
+                <span className="text-slate-500">%</span>
               </div>
             </div>
 
