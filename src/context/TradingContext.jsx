@@ -161,99 +161,38 @@ export const TradingProvider = ({ children }) => {
             throw new Error('Market price unavailable');
         }
 
-        const margin = parsedAmount;
-        const fee = margin * 0.001;
-        const cost = margin + fee;
+        const { data, error } = await supabase.rpc('open_position_tx', {
+            p_user_id: user.id,
+            p_symbol: 'BTCUSDT',
+            p_side: order.side,
+            p_entry_price: safePrice,
+            p_margin: parsedAmount,
+            p_leverage: parsedLeverage,
+            p_take_profit: order.tp || null,
+            p_stop_loss: order.sl || null
+        });
 
-        if (Number(profile.balance) < cost) throw new Error('Insufficient Balance');
-
-        const liqPrice = order.side === 'LONG'
-            ? safePrice * (1 - 1 / parsedLeverage + 0.005)
-            : safePrice * (1 + 1 / parsedLeverage - 0.005);
-
-        const newPosition = {
-            user_id: user.id,
-            symbol: 'BTCUSDT',
-            side: order.side,
-            entry_price: safePrice,
-            size: margin * parsedLeverage,
-            leverage: parsedLeverage,
-            margin,
-            liquidation_price: liqPrice,
-            take_profit: order.tp || null,
-            stop_loss: order.sl || null
-        };
-
-        const previousBalance = Number(profile.balance);
-        const { error: balError } = await supabase
-            .from('profiles')
-            .update({ balance: previousBalance - cost })
-            .eq('id', user.id);
-
-        if (balError) throw balError;
-
-        const { data: posData, error: posError } = await supabase
-            .from('positions')
-            .insert([newPosition])
-            .select()
-            .single();
-
-        if (posError) {
-            await supabase.from('profiles').update({ balance: previousBalance }).eq('id', user.id);
-            throw posError;
-        }
+        if (error) throw error;
 
         await fetchData(user.id);
-        return posData;
+        return data;
     };
 
     const closePosition = async (position) => {
         if (!user) return;
 
-        const quantity = Number(position.size) / Number(position.entry_price);
-        let pnl = 0;
-        if (position.side === 'LONG') {
-            pnl = (Number(currentPrice) - Number(position.entry_price)) * quantity;
-        } else {
-            pnl = (Number(position.entry_price) - Number(currentPrice)) * quantity;
+        const exitPrice = Number(currentPrice);
+        if (!Number.isFinite(exitPrice) || exitPrice <= 0) {
+            throw new Error('Market price unavailable');
         }
 
-        const roi = (pnl / Number(position.margin)) * 100;
-        const returnAmount = Number(position.margin) + pnl;
+        const { error } = await supabase.rpc('close_position_tx', {
+            p_user_id: user.id,
+            p_position_id: position.id,
+            p_exit_price: exitPrice
+        });
 
-        const { error: delError } = await supabase.from('positions').delete().eq('id', position.id);
-        if (delError) throw delError;
-
-        const historyEntry = {
-            user_id: user.id,
-            symbol: position.symbol,
-            side: position.side,
-            entry_price: position.entry_price,
-            exit_price: currentPrice,
-            pnl,
-            roi,
-            closed_at: new Date().toISOString()
-        };
-
-        const { error: historyError } = await supabase.from('trade_history').insert([historyEntry]);
-        if (historyError) throw historyError;
-
-        const { data: latestProfile, error: latestProfileError } = await supabase
-            .from('profiles')
-            .select('balance')
-            .eq('id', user.id)
-            .single();
-
-        if (latestProfileError) throw latestProfileError;
-
-        const { error: balanceError } = await supabase
-            .from('profiles')
-            .update({
-                balance: Number(latestProfile.balance) + Number(returnAmount)
-            })
-            .eq('id', user.id);
-
-        if (balanceError) throw balanceError;
+        if (error) throw error;
 
         await fetchData(user.id);
     };

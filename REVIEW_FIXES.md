@@ -31,5 +31,12 @@ Date: 2026-02-13
 - `npm run lint` ✅ passes
 - `npm run build` ✅ passes
 
-## Remaining important recommendation (not fully solved in frontend)
-- For true accounting consistency, move open/close trade operations into a **single Supabase RPC transaction** (DB-level atomicity). Current code is safer than before but still app-driven.
+## Transactional trading (implemented)
+- Added DB RPC script: `supabase_rpc_trading.sql`
+  - `open_position_tx(...)`
+  - `close_position_tx(...)`
+- Updated frontend trade actions to call those RPCs via `supabase.rpc(...)`.
+- This moves critical open/close accounting into database transactions.
+
+## Important next step
+- Run `supabase_rpc_trading.sql` in your Supabase SQL editor (once) so production uses the transactional path.
