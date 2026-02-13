@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabase';
 import { TradingContext } from './TradingContextCore';
 
@@ -7,9 +7,11 @@ export const TradingProvider = ({ children }) => {
     const [profile, setProfile] = useState(null);
     const [positions, setPositions] = useState([]);
     const [history, setHistory] = useState([]);
+    const [pendingOrders, setPendingOrders] = useState([]);
     const [currentPrice, setCurrentPrice] = useState(0);
     const [ticker24h, setTicker24h] = useState({ change: 0, high: 0, low: 0, vol: 0 });
     const ws = useRef(null);
+    const checkingRef = useRef(false);
 
     const [marketSentiment, setMarketSentiment] = useState(null);
     const [newsSentiment, setNewsSentiment] = useState(null);
@@ -26,19 +28,14 @@ export const TradingProvider = ({ children }) => {
             if (newsData.Data && newsData.Data.length > 0) {
                 const positiveWords = ['bull', 'surge', 'gain', 'adoption', 'record', 'high', 'approve', 'etf', 'launch', 'growth'];
                 const negativeWords = ['bear', 'crash', 'ban', 'hack', 'drop', 'low', 'reject', 'sec', 'fraud', 'collapse'];
-
                 let score = 0;
                 let count = 0;
 
                 newsData.Data.slice(0, 50).forEach(article => {
-                    const title = article.title.toLowerCase();
-                    const body = article.body.toLowerCase();
-                    const text = `${title} ${body}`;
-
+                    const text = `${article.title.toLowerCase()} ${article.body.toLowerCase()}`;
                     let articleScore = 0;
                     positiveWords.forEach(word => { if (text.includes(word)) articleScore++; });
                     negativeWords.forEach(word => { if (text.includes(word)) articleScore--; });
-
                     if (articleScore !== 0) {
                         score += articleScore > 0 ? 1 : -1;
                         count++;
@@ -46,11 +43,7 @@ export const TradingProvider = ({ children }) => {
                 });
 
                 const normalizedScore = count > 0 ? (score / count).toFixed(2) : 0;
-                setNewsSentiment({
-                    score: normalizedScore,
-                    articleCount: newsData.Data.length,
-                    analyzedCount: count
-                });
+                setNewsSentiment({ score: normalizedScore, articleCount: newsData.Data.length, analyzedCount: count });
             }
         } catch (error) {
             console.error('Error fetching market data:', error);
@@ -60,32 +53,34 @@ export const TradingProvider = ({ children }) => {
     const fetchData = async (userId) => {
         if (!userId) return;
         try {
-            const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-
-            if (profileError) {
-                console.error('Error fetching profile:', profileError);
-                return;
-            }
+            const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', userId).single();
+            if (profileError) throw profileError;
             setProfile(profileData);
 
-            const { data: posData } = await supabase
+            const { data: posData, error: posError } = await supabase
                 .from('positions')
                 .select('*')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
+            if (posError) throw posError;
             setPositions(posData || []);
 
-            const { data: histData } = await supabase
+            const { data: histData, error: histError } = await supabase
                 .from('trade_history')
                 .select('*')
                 .eq('user_id', userId)
                 .order('closed_at', { ascending: false })
                 .limit(50);
+            if (histError) throw histError;
             setHistory(histData || []);
+
+            const { data: pendingData, error: pendingError } = await supabase
+                .from('pending_orders')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+            if (pendingError) throw pendingError;
+            setPendingOrders(pendingData || []);
         } catch (error) {
             console.error('Error in fetchData:', error);
         }
@@ -106,6 +101,7 @@ export const TradingProvider = ({ children }) => {
                 setProfile(null);
                 setPositions([]);
                 setHistory([]);
+                setPendingOrders([]);
             }
         });
 
@@ -114,7 +110,6 @@ export const TradingProvider = ({ children }) => {
 
     useEffect(() => {
         ws.current = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
-
         ws.current.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.c) {
@@ -128,21 +123,8 @@ export const TradingProvider = ({ children }) => {
                 });
             }
         };
-
-        return () => {
-            if (ws.current) ws.current.close();
-        };
+        return () => { if (ws.current) ws.current.close(); };
     }, []);
-
-    const checkTriggers = async () => {
-        // TODO: Implement TP/SL logic
-    };
-
-    useEffect(() => {
-        if (currentPrice && positions.length > 0) {
-            checkTriggers();
-        }
-    }, [currentPrice, positions]);
 
     const placeOrder = async (order) => {
         if (!user || !profile) throw new Error('Please login to trade');
@@ -151,69 +133,162 @@ export const TradingProvider = ({ children }) => {
         const parsedLeverage = Number(order.leverage);
         const safePrice = Number(currentPrice);
 
-        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-            throw new Error('Invalid order amount');
-        }
-        if (!Number.isFinite(parsedLeverage) || parsedLeverage < 1 || parsedLeverage > 50) {
-            throw new Error('Leverage must be between 1 and 50');
-        }
-        if (!Number.isFinite(safePrice) || safePrice <= 0) {
-            throw new Error('Market price unavailable');
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) throw new Error('Invalid order amount');
+        if (!Number.isFinite(parsedLeverage) || parsedLeverage < 1 || parsedLeverage > 50) throw new Error('Leverage must be between 1 and 50');
+        if (!Number.isFinite(safePrice) || safePrice <= 0) throw new Error('Market price unavailable');
+
+        const safeTp = order.tp ? Number(order.tp) : null;
+        const safeSl = order.sl ? Number(order.sl) : null;
+
+        if (safeTp !== null && (!Number.isFinite(safeTp) || safeTp <= 0)) throw new Error('Invalid TP');
+        if (safeSl !== null && (!Number.isFinite(safeSl) || safeSl <= 0)) throw new Error('Invalid SL');
+
+        if (order.type === 'MARKET') {
+            const { data, error } = await supabase.rpc('open_position_tx', {
+                p_user_id: user.id,
+                p_symbol: 'BTCUSDT',
+                p_side: order.side,
+                p_entry_price: safePrice,
+                p_margin: parsedAmount,
+                p_leverage: parsedLeverage,
+                p_take_profit: safeTp,
+                p_stop_loss: safeSl
+            });
+            if (error) throw error;
+            await fetchData(user.id);
+            return data;
         }
 
-        const { data, error } = await supabase.rpc('open_position_tx', {
-            p_user_id: user.id,
-            p_symbol: 'BTCUSDT',
-            p_side: order.side,
-            p_entry_price: safePrice,
-            p_margin: parsedAmount,
-            p_leverage: parsedLeverage,
-            p_take_profit: order.tp || null,
-            p_stop_loss: order.sl || null
-        });
+        const triggerPrice = Number(order.triggerPrice);
+        if (!Number.isFinite(triggerPrice) || triggerPrice <= 0) throw new Error('Invalid trigger price');
+
+        const { data, error } = await supabase
+            .from('pending_orders')
+            .insert([{
+                user_id: user.id,
+                symbol: 'BTCUSDT',
+                order_type: order.type,
+                side: order.side,
+                trigger_price: triggerPrice,
+                margin: parsedAmount,
+                leverage: parsedLeverage,
+                take_profit: safeTp,
+                stop_loss: safeSl
+            }])
+            .select()
+            .single();
 
         if (error) throw error;
-
         await fetchData(user.id);
         return data;
     };
 
     const closePosition = async (position) => {
         if (!user) return;
-
         const exitPrice = Number(currentPrice);
-        if (!Number.isFinite(exitPrice) || exitPrice <= 0) {
-            throw new Error('Market price unavailable');
-        }
+        if (!Number.isFinite(exitPrice) || exitPrice <= 0) throw new Error('Market price unavailable');
 
         const { error } = await supabase.rpc('close_position_tx', {
             p_user_id: user.id,
             p_position_id: position.id,
             p_exit_price: exitPrice
         });
-
         if (error) throw error;
-
         await fetchData(user.id);
     };
+
+    const cancelPendingOrder = async (orderId) => {
+        if (!user) return;
+        const { error } = await supabase.from('pending_orders').delete().eq('id', orderId).eq('user_id', user.id);
+        if (error) throw error;
+        await fetchData(user.id);
+    };
+
+    const checkTriggers = useCallback(async () => {
+        if (!user || !currentPrice || checkingRef.current) return;
+        checkingRef.current = true;
+        try {
+            for (const pos of positions) {
+                const tp = pos.take_profit ? Number(pos.take_profit) : null;
+                const sl = pos.stop_loss ? Number(pos.stop_loss) : null;
+                let hit = false;
+
+                if (pos.side === 'LONG') {
+                    if (tp && Number(currentPrice) >= tp) hit = true;
+                    if (sl && Number(currentPrice) <= sl) hit = true;
+                } else {
+                    if (tp && Number(currentPrice) <= tp) hit = true;
+                    if (sl && Number(currentPrice) >= sl) hit = true;
+                }
+
+                if (hit) {
+                    await supabase.rpc('close_position_tx', {
+                        p_user_id: user.id,
+                        p_position_id: pos.id,
+                        p_exit_price: Number(currentPrice)
+                    });
+                }
+            }
+
+            for (const o of pendingOrders) {
+                const trigger = Number(o.trigger_price);
+                let shouldOpen = false;
+
+                if (o.order_type === 'LIMIT') {
+                    if (o.side === 'LONG' && Number(currentPrice) <= trigger) shouldOpen = true;
+                    if (o.side === 'SHORT' && Number(currentPrice) >= trigger) shouldOpen = true;
+                }
+                if (o.order_type === 'STOP') {
+                    if (o.side === 'LONG' && Number(currentPrice) >= trigger) shouldOpen = true;
+                    if (o.side === 'SHORT' && Number(currentPrice) <= trigger) shouldOpen = true;
+                }
+
+                if (shouldOpen) {
+                    const { error: openErr } = await supabase.rpc('open_position_tx', {
+                        p_user_id: user.id,
+                        p_symbol: o.symbol,
+                        p_side: o.side,
+                        p_entry_price: Number(currentPrice),
+                        p_margin: Number(o.margin),
+                        p_leverage: Number(o.leverage),
+                        p_take_profit: o.take_profit,
+                        p_stop_loss: o.stop_loss
+                    });
+                    if (!openErr) {
+                        await supabase.from('pending_orders').delete().eq('id', o.id).eq('user_id', user.id);
+                    }
+                }
+            }
+
+            await fetchData(user.id);
+        } catch (error) {
+            console.error('Trigger execution error:', error);
+        } finally {
+            checkingRef.current = false;
+        }
+    }, [user, currentPrice, positions, pendingOrders]);
+
+    useEffect(() => {
+        if (currentPrice && user && (positions.length > 0 || pendingOrders.length > 0)) {
+            checkTriggers();
+        }
+    }, [currentPrice, user, positions, pendingOrders, checkTriggers]);
 
     const value = {
         user,
         profile,
         positions,
         history,
+        pendingOrders,
         currentPrice,
         ticker24h,
         placeOrder,
         closePosition,
+        cancelPendingOrder,
         fetchData,
         marketSentiment,
         newsSentiment
     };
 
-    return (
-        <TradingContext.Provider value={value}>
-            {children}
-        </TradingContext.Provider>
-    );
+    return <TradingContext.Provider value={value}>{children}</TradingContext.Provider>;
 };
