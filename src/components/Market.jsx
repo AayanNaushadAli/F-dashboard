@@ -157,23 +157,34 @@ const Market = () => {
 
   return (
     <div className="h-screen bg-slate-900 text-slate-100 font-sans flex flex-col">
-      <div className="h-14 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/50 backdrop-blur-sm z-10 shrink-0">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="text-slate-400 hover:text-white transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="relative group">
-              <PairSelector
-                currentSymbol={currentSymbol}
-                pairs={availablePairs}
-                onSelect={changeSymbol}
-              />
+      <div className="h-auto md:h-14 border-b border-slate-800 flex flex-col md:flex-row items-start md:items-center px-4 md:px-6 justify-between bg-slate-900/50 backdrop-blur-sm z-10 shrink-0 py-2 md:py-0 gap-2 md:gap-0">
+        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+          <div className="flex items-center gap-4">
+            <Link to="/" className="text-slate-400 hover:text-white transition-colors">
+              <ArrowLeft size={20} />
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="relative group">
+                <PairSelector
+                  currentSymbol={currentSymbol}
+                  pairs={availablePairs}
+                  onSelect={changeSymbol}
+                />
+              </div>
+              <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-400 hidden sm:inline">Perpetual</span>
             </div>
-            <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-400">Perpetual</span>
+          </div>
+          {/* Mobile Stats Show here */}
+          <div className="flex md:hidden items-center gap-4 text-xs">
+            <span className={`font-mono font-medium ${currentPrice > ticker24h.low ? 'text-emerald-400' : 'text-red-400'}`}>
+              ${currentPrice?.toLocaleString()}
+            </span>
+            <span className={`font-mono font-medium ${ticker24h.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {ticker24h.change > 0 ? '+' : ''}{ticker24h.change}%
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-6 text-sm">
+        <div className="hidden md:flex items-center gap-6 text-sm">
           <div className="flex flex-col items-end">
             <span className="text-slate-400 text-xs">Mark Price</span>
             <span className={`font-mono font-medium ${currentPrice > ticker24h.low ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -190,27 +201,27 @@ const Market = () => {
       </div>
 
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 bg-slate-900 relative border-r border-slate-800 min-h-0" ref={container}></div>
 
-          <div onMouseDown={handleMouseDown} className="h-2 bg-slate-800 hover:bg-blue-500/50 cursor-row-resize flex items-center justify-center transition-colors z-10 shrink-0 border-t border-slate-700">
+          <div onMouseDown={handleMouseDown} className="h-2 bg-slate-800 hover:bg-blue-500/50 cursor-row-resize flex items-center justify-center transition-colors z-10 shrink-0 border-t border-slate-700 hidden lg:flex">
             <GripHorizontal size={12} className="text-slate-500" />
           </div>
 
-          <div className="bg-slate-900 border-r border-slate-800 flex flex-col shrink-0" style={{ height: positionsHeight }}>
+          <div className="bg-slate-900 border-r border-slate-800 flex flex-col shrink-0" style={{ height: window.innerWidth < 1024 ? 'auto' : positionsHeight }}>
             <div className="px-4 py-2 border-b border-slate-800 font-medium text-sm text-slate-300 flex justify-between items-center">
               <span>Open Positions ({positions.length})</span>
-              <span className="text-xs text-slate-500">Drag separator to resize</span>
+              <span className="text-xs text-slate-500 hidden lg:inline">Drag separator to resize</span>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto max-h-48 lg:max-h-none">
               <table className="w-full text-xs text-left">
                 <thead className="text-slate-500 bg-slate-800/30 sticky top-0">
                   <tr>
                     <th className="px-4 py-2">Symbol</th>
                     <th className="px-4 py-2">Entry</th>
-                    <th className="px-4 py-2">Mark</th>
-                    <th className="px-4 py-2">Risk Controls</th>
+                    <th className="px-4 py-2 hidden sm:table-cell">Mark</th>
+                    <th className="px-4 py-2 hidden sm:table-cell">Risk Controls</th>
                     <th className="px-4 py-2">PnL</th>
                     <th className="px-4 py-2 text-right">Actions</th>
                   </tr>
@@ -222,11 +233,11 @@ const Market = () => {
                     return (
                       <tr key={pos.id} className="border-b border-slate-800 hover:bg-slate-800/20">
                         <td className="px-4 py-3 font-medium">
-                          <span className={pos.side === 'LONG' ? 'text-emerald-400' : 'text-red-400'}>{pos.side}</span> {pos.symbol} <span className="text-slate-500">{pos.leverage}x</span>
+                          <span className={pos.side === 'LONG' ? 'text-emerald-400' : 'text-red-400'}>{pos.side}</span> {pos.symbol} <span className="text-slate-500 block sm:inline">{pos.leverage}x</span>
                         </td>
                         <td className="px-4 py-3 font-mono">${Number(pos.entry_price).toLocaleString()}</td>
-                        <td className="px-4 py-3 font-mono">${Number(currentPrice).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-slate-300 text-[11px]">
+                        <td className="px-4 py-3 font-mono hidden sm:table-cell">${Number(currentPrice).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-slate-300 text-[11px] hidden sm:table-cell">
                           TP: {pos.take_profit ? Number(pos.take_profit).toFixed(2) : '-'}
                           <br />
                           SL: {pos.stop_loss ? Number(pos.stop_loss).toFixed(2) : '-'}
@@ -235,11 +246,11 @@ const Market = () => {
                         </td>
                         <td className="px-4 py-3 font-mono">
                           <span className={pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}</span>
-                          <span className={`ml-1 text-[10px] ${roe >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>({roe.toFixed(2)}%)</span>
+                          <span className={`block sm:ml-1 text-[10px] ${roe >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>({roe.toFixed(2)}%)</span>
                         </td>
-                        <td className="px-4 py-3 text-right space-x-2">
-                          <button onClick={() => openTicket(pos, 'risk')} className="text-blue-300 hover:text-blue-200">TP/SL</button>
-                          <button onClick={() => openTicket(pos, 'close')} className="text-red-300 hover:text-red-200">Close</button>
+                        <td className="px-4 py-3 text-right space-y-1 sm:space-y-0 sm:space-x-2">
+                          <button onClick={() => openTicket(pos, 'risk')} className="text-blue-300 hover:text-blue-200 block sm:inline">TP/SL</button>
+                          <button onClick={() => openTicket(pos, 'close')} className="text-red-300 hover:text-red-200 block sm:inline">Close</button>
                         </td>
                       </tr>
                     );
@@ -255,8 +266,7 @@ const Market = () => {
                     <div key={o.id} className="bg-slate-800/40 border border-slate-700 rounded p-2 text-xs flex items-center justify-between">
                       <div>
                         <span className="text-blue-300">{o.order_type}</span> {o.side} @ <span className="font-mono">{Number(o.trigger_price).toFixed(2)}</span>
-                        <span className="text-slate-500 ml-2">{o.leverage}x • ${Number(o.margin).toFixed(2)}</span>
-                        {o.reduce_only ? <span className="ml-2 text-amber-300">Reduce-Only</span> : null}
+                        <span className="text-slate-500 ml-2 block sm:inline">{o.leverage}x • ${Number(o.margin).toFixed(2)}</span>
                       </div>
                       <button onClick={() => cancelPendingOrder(o.id)} className="text-red-400 hover:text-red-300">Cancel</button>
                     </div>
@@ -264,7 +274,7 @@ const Market = () => {
                   {pendingOrders.length === 0 && <div className="text-slate-500 text-xs">No pending orders</div>}
                 </div>
 
-                <div className="mt-4 border-t border-slate-800 pt-3">
+                <div className="mt-4 border-t border-slate-800 pt-3 hidden lg:block">
                   <div className="text-xs text-slate-400 mb-2">Recent Fills</div>
                   <div className="space-y-1">
                     {(history || []).slice(0, 8).map((h) => (
@@ -281,7 +291,7 @@ const Market = () => {
           </div>
         </div>
 
-        <div className="w-80 bg-slate-900 flex flex-col border-l border-slate-800 shrink-0">
+        <div className="w-full lg:w-80 h-[450px] lg:h-auto bg-slate-900 flex flex-col border-t lg:border-t-0 border-l-0 lg:border-l border-slate-800 shrink-0">
           <div className="flex border-b border-slate-800">
             {['LIMIT', 'MARKET', 'STOP'].map(type => (
               <button key={type} onClick={() => setOrderType(type)} className={`flex-1 py-3 text-sm font-medium ${orderType === type ? 'text-blue-400 border-b-2 border-blue-400 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300'}`}>
