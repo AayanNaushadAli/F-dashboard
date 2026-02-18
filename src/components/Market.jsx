@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ArrowLeft, Wallet, AlertCircle, GripHorizontal, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTrading } from '../context/useTrading';
+import PairSelector from './PairSelector';
 
 const Market = () => {
   const { profile, currentPrice, ticker24h, placeOrder, positions, pendingOrders, history, closePosition, closePositionPartial, updatePositionRisk, cancelPendingOrder, currentSymbol, changeSymbol, availablePairs } = useTrading();
@@ -163,21 +164,11 @@ const Market = () => {
           </Link>
           <div className="flex items-center gap-2">
             <div className="relative group">
-              <select
-                value={currentSymbol}
-                onChange={(e) => changeSymbol(e.target.value)}
-                className="appearance-none bg-transparent font-bold text-lg text-slate-100 pr-6 cursor-pointer focus:outline-none"
-              >
-                {availablePairs.length > 0 ? (
-                  availablePairs.map(pair => (
-                    <option key={pair} value={pair} className="bg-slate-800 text-slate-200">
-                      {pair.replace('USDT', '/USDT')}
-                    </option>
-                  ))
-                ) : (
-                  <option value="BTCUSDT" className="bg-slate-800 text-slate-200">BTC/USDT</option>
-                )}
-              </select>
+              <PairSelector
+                currentSymbol={currentSymbol}
+                pairs={availablePairs}
+                onSelect={changeSymbol}
+              />
             </div>
             <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-400">Perpetual</span>
           </div>
