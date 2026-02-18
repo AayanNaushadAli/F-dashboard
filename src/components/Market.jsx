@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useTrading } from '../context/useTrading';
 
 const Market = () => {
-  const { profile, currentPrice, ticker24h, placeOrder, positions, pendingOrders, history, closePosition, closePositionPartial, updatePositionRisk, cancelPendingOrder } = useTrading();
+  const { profile, currentPrice, ticker24h, placeOrder, positions, pendingOrders, history, closePosition, closePositionPartial, updatePositionRisk, cancelPendingOrder, currentSymbol, changeSymbol, availablePairs } = useTrading();
   const container = useRef();
 
   const [orderType, setOrderType] = useState('MARKET');
@@ -31,7 +31,7 @@ const Market = () => {
 
   useEffect(() => {
     if (!container.current) return;
-    if (container.current.querySelector('script')) return;
+    container.current.innerHTML = ''; // Clear previous chart
 
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
@@ -40,7 +40,7 @@ const Market = () => {
     script.innerHTML = `
       {
         "autosize": true,
-        "symbol": "BINANCE:BTCUSDT",
+        "symbol": "BINANCE:${currentSymbol}",
         "interval": "D",
         "timezone": "Etc/UTC",
         "theme": "dark",
@@ -53,7 +53,7 @@ const Market = () => {
       }`;
 
     container.current.appendChild(script);
-  }, []);
+  }, [currentSymbol]);
 
   const handleMouseDown = (e) => {
     isDragging.current = true;
@@ -162,7 +162,23 @@ const Market = () => {
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-lg">BTC/USDT</span>
+            <div className="relative group">
+              <select
+                value={currentSymbol}
+                onChange={(e) => changeSymbol(e.target.value)}
+                className="appearance-none bg-transparent font-bold text-lg text-slate-100 pr-6 cursor-pointer focus:outline-none"
+              >
+                {availablePairs.length > 0 ? (
+                  availablePairs.map(pair => (
+                    <option key={pair} value={pair} className="bg-slate-800 text-slate-200">
+                      {pair.replace('USDT', '/USDT')}
+                    </option>
+                  ))
+                ) : (
+                  <option value="BTCUSDT" className="bg-slate-800 text-slate-200">BTC/USDT</option>
+                )}
+              </select>
+            </div>
             <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-400">Perpetual</span>
           </div>
         </div>
@@ -181,6 +197,7 @@ const Market = () => {
           </div>
         </div>
       </div>
+
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0">
@@ -362,95 +379,97 @@ const Market = () => {
         </div>
       </div>
 
-      {ticket.open && ticket.position && (
-        <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setTicket({ open: false, tab: 'close', position: null })} />
-          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-slate-700 z-50 p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold">Order Ticket</h3>
-              <button onClick={() => setTicket({ open: false, tab: 'close', position: null })} className="text-slate-400">✕</button>
-            </div>
-
-            <div className="flex border border-slate-700 rounded-lg overflow-hidden mb-4 text-xs">
-              <button onClick={() => setTicket((t) => ({ ...t, tab: 'close' }))} className={`flex-1 py-2 ${ticket.tab === 'close' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Close Position</button>
-              <button onClick={() => setTicket((t) => ({ ...t, tab: 'risk' }))} className={`flex-1 py-2 ${ticket.tab === 'risk' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Modify TP/SL</button>
-              <button onClick={() => setTicket((t) => ({ ...t, tab: 'advanced' }))} className={`flex-1 py-2 ${ticket.tab === 'advanced' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Advanced</button>
-            </div>
-
-            {ticket.tab === 'close' && (
-              <div className="space-y-3">
-                <p className="text-xs text-slate-400">How much do you want to exit?</p>
-                <input
-                  type="number"
-                  value={closeModal.percent}
-                  onChange={(e) => setCloseModal((prev) => ({ ...prev, percent: e.target.value }))}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  min="1"
-                  max="100"
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setCloseModal((p) => ({ ...p, percent: '25' }))} className="px-2 py-1 text-xs bg-slate-800 rounded">25%</button>
-                  <button onClick={() => setCloseModal((p) => ({ ...p, percent: '50' }))} className="px-2 py-1 text-xs bg-slate-800 rounded">50%</button>
-                  <button onClick={() => setCloseModal((p) => ({ ...p, percent: '100' }))} className="px-2 py-1 text-xs bg-slate-800 rounded">100%</button>
-                </div>
-                <button onClick={submitClose} className="w-full py-2 text-sm bg-red-600 rounded">Confirm Close</button>
+      {
+        ticket.open && ticket.position && (
+          <>
+            <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setTicket({ open: false, tab: 'close', position: null })} />
+            <div className="fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-slate-700 z-50 p-4 overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold">Order Ticket</h3>
+                <button onClick={() => setTicket({ open: false, tab: 'close', position: null })} className="text-slate-400">✕</button>
               </div>
-            )}
 
-            {ticket.tab === 'risk' && (
-              <div className="space-y-3">
-                <input
-                  type="number"
-                  placeholder="Take Profit"
-                  value={getRiskDraft(ticket.position).tp}
-                  onChange={(e) => onRiskDraftChange(ticket.position.id, { tp: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                />
-                <input
-                  type="number"
-                  placeholder="Stop Loss"
-                  value={getRiskDraft(ticket.position).sl}
-                  onChange={(e) => onRiskDraftChange(ticket.position.id, { sl: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(getRiskDraft(ticket.position).trailingEnabled)}
-                    onChange={(e) => onRiskDraftChange(ticket.position.id, { trailingEnabled: e.target.checked })}
-                  />
-                  Enable trailing SL
-                </label>
-                <div className="flex items-center gap-2">
+              <div className="flex border border-slate-700 rounded-lg overflow-hidden mb-4 text-xs">
+                <button onClick={() => setTicket((t) => ({ ...t, tab: 'close' }))} className={`flex-1 py-2 ${ticket.tab === 'close' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Close Position</button>
+                <button onClick={() => setTicket((t) => ({ ...t, tab: 'risk' }))} className={`flex-1 py-2 ${ticket.tab === 'risk' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Modify TP/SL</button>
+                <button onClick={() => setTicket((t) => ({ ...t, tab: 'advanced' }))} className={`flex-1 py-2 ${ticket.tab === 'advanced' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Advanced</button>
+              </div>
+
+              {ticket.tab === 'close' && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400">How much do you want to exit?</p>
                   <input
                     type="number"
-                    value={getRiskDraft(ticket.position).trailingPercent}
-                    onChange={(e) => onRiskDraftChange(ticket.position.id, { trailingPercent: e.target.value })}
-                    disabled={!getRiskDraft(ticket.position).trailingEnabled}
-                    className="w-24 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    value={closeModal.percent}
+                    onChange={(e) => setCloseModal((prev) => ({ ...prev, percent: e.target.value }))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    min="1"
+                    max="100"
                   />
-                  <span className="text-slate-400 text-sm">%</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setCloseModal((p) => ({ ...p, percent: '25' }))} className="px-2 py-1 text-xs bg-slate-800 rounded">25%</button>
+                    <button onClick={() => setCloseModal((p) => ({ ...p, percent: '50' }))} className="px-2 py-1 text-xs bg-slate-800 rounded">50%</button>
+                    <button onClick={() => setCloseModal((p) => ({ ...p, percent: '100' }))} className="px-2 py-1 text-xs bg-slate-800 rounded">100%</button>
+                  </div>
+                  <button onClick={submitClose} className="w-full py-2 text-sm bg-red-600 rounded">Confirm Close</button>
                 </div>
-                <button onClick={saveRisk} className="w-full py-2 text-sm bg-blue-600 rounded">Save Risk Settings</button>
-              </div>
-            )}
+              )}
 
-            {ticket.tab === 'advanced' && (
-              <div className="space-y-2 text-xs text-slate-300">
-                <div className="p-3 bg-slate-800/50 rounded border border-slate-700">
-                  <div className="font-medium mb-1">OCO Bracket Link</div>
-                  <div className="text-slate-400">TP and SL are managed as one bracket path in trigger checks (first hit closes position).</div>
+              {ticket.tab === 'risk' && (
+                <div className="space-y-3">
+                  <input
+                    type="number"
+                    placeholder="Take Profit"
+                    value={getRiskDraft(ticket.position).tp}
+                    onChange={(e) => onRiskDraftChange(ticket.position.id, { tp: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stop Loss"
+                    value={getRiskDraft(ticket.position).sl}
+                    onChange={(e) => onRiskDraftChange(ticket.position.id, { sl: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  />
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(getRiskDraft(ticket.position).trailingEnabled)}
+                      onChange={(e) => onRiskDraftChange(ticket.position.id, { trailingEnabled: e.target.checked })}
+                    />
+                    Enable trailing SL
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={getRiskDraft(ticket.position).trailingPercent}
+                      onChange={(e) => onRiskDraftChange(ticket.position.id, { trailingPercent: e.target.value })}
+                      disabled={!getRiskDraft(ticket.position).trailingEnabled}
+                      className="w-24 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    />
+                    <span className="text-slate-400 text-sm">%</span>
+                  </div>
+                  <button onClick={saveRisk} className="w-full py-2 text-sm bg-blue-600 rounded">Save Risk Settings</button>
                 </div>
-                <div className="p-3 bg-slate-800/50 rounded border border-slate-700">
-                  <div className="font-medium mb-1">Reduce-only behavior</div>
-                  <div className="text-slate-400">Reduce-only prevents increasing opposite exposure and only reduces open positions.</div>
+              )}
+
+              {ticket.tab === 'advanced' && (
+                <div className="space-y-2 text-xs text-slate-300">
+                  <div className="p-3 bg-slate-800/50 rounded border border-slate-700">
+                    <div className="font-medium mb-1">OCO Bracket Link</div>
+                    <div className="text-slate-400">TP and SL are managed as one bracket path in trigger checks (first hit closes position).</div>
+                  </div>
+                  <div className="p-3 bg-slate-800/50 rounded border border-slate-700">
+                    <div className="font-medium mb-1">Reduce-only behavior</div>
+                    <div className="text-slate-400">Reduce-only prevents increasing opposite exposure and only reduces open positions.</div>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+              )}
+            </div>
+          </>
+        )
+      }
+    </div >
   );
 };
 

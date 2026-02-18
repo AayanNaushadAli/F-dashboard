@@ -10,6 +10,8 @@ export const TradingProvider = ({ children }) => {
     const [pendingOrders, setPendingOrders] = useState([]);
     const [currentPrice, setCurrentPrice] = useState(0);
     const [ticker24h, setTicker24h] = useState({ change: 0, high: 0, low: 0, vol: 0 });
+    const [currentSymbol, setCurrentSymbol] = useState('BTCUSDT');
+    const [availablePairs, setAvailablePairs] = useState([]);
     const ws = useRef(null);
     const checkingRef = useRef(false);
     const trailAnchorsRef = useRef({});
@@ -20,6 +22,15 @@ export const TradingProvider = ({ children }) => {
 
     const fetchMarketData = async () => {
         try {
+            // Fetch available pairs
+            const exchangeInfoRes = await fetch('https://api.binance.com/api/v3/exchangeInfo');
+            const exchangeInfo = await exchangeInfoRes.json();
+            const usdtPairs = exchangeInfo.symbols
+                .filter(s => s.quoteAsset === 'USDT' && s.status === 'TRADING')
+                .map(s => s.symbol)
+                .sort();
+            setAvailablePairs(usdtPairs);
+
             const fgRes = await fetch('https://api.alternative.me/fng/?limit=1');
             const fgData = await fgRes.json();
             setMarketSentiment(fgData.data[0]);
@@ -113,7 +124,9 @@ export const TradingProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        ws.current = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+        if (ws.current) ws.current.close();
+
+        ws.current = new WebSocket(`wss://stream.binance.com:9443/ws/${currentSymbol.toLowerCase()}@ticker`);
         ws.current.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.c) {
@@ -128,7 +141,7 @@ export const TradingProvider = ({ children }) => {
             }
         };
         return () => { if (ws.current) ws.current.close(); };
-    }, []);
+    }, [currentSymbol]);
 
     const placeOrder = async (order) => {
         if (!user || !profile) throw new Error('Please login to trade');
@@ -156,7 +169,7 @@ export const TradingProvider = ({ children }) => {
         if (order.type === 'MARKET') {
             if (reduceOnly) {
                 let remaining = parsedAmount;
-                const reducible = positions.filter((p) => p.symbol === 'BTCUSDT' && p.side !== order.side);
+                const reducible = positions.filter((p) => p.symbol === currentSymbol && p.side !== order.side);
                 for (const pos of reducible) {
                     if (remaining <= 0) break;
                     const posMargin = Number(pos.margin);
@@ -176,7 +189,7 @@ export const TradingProvider = ({ children }) => {
 
             const { data, error } = await supabase.rpc('open_position_tx', {
                 p_user_id: user.id,
-                p_symbol: 'BTCUSDT',
+                p_symbol: currentSymbol,
                 p_side: order.side,
                 p_entry_price: safePrice,
                 p_margin: parsedAmount,
@@ -209,7 +222,7 @@ export const TradingProvider = ({ children }) => {
             .from('pending_orders')
             .insert([{
                 user_id: user.id,
-                symbol: 'BTCUSDT',
+                symbol: currentSymbol,
                 order_type: order.type,
                 side: order.side,
                 trigger_price: triggerPrice,
@@ -415,6 +428,9 @@ export const TradingProvider = ({ children }) => {
         pendingOrders,
         currentPrice,
         ticker24h,
+        currentSymbol,
+        availablePairs,
+        changeSymbol: setCurrentSymbol,
         placeOrder,
         closePosition,
         closePositionPartial,
