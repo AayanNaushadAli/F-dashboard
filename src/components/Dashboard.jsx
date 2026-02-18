@@ -11,6 +11,7 @@ import KillzoneStatus from './KillzoneStatus';
 import { supabase } from '../supabase';
 
 import Layout from './Layout';
+import QuickTradeModal from './QuickTradeModal';
 
 const Dashboard = () => {
     const { user, profile, history, positions, marketSentiment, newsSentiment, currentPrice, currentSymbol } = useTrading();
@@ -81,11 +82,46 @@ const Dashboard = () => {
         await supabase.auth.signOut();
         navigate('/login');
     };
+    const [quickTrade, setQuickTrade] = useState({ open: false, data: null });
+    const { placeOrder } = useTrading();
+
+    const handleExecuteSignal = (signalData) => {
+        setQuickTrade({ open: true, data: signalData });
+    };
+
+    const confirmQuickTrade = async (tradeParams) => {
+        try {
+            await placeOrder({
+                side: tradeParams.side,
+                amount: tradeParams.amount,
+                leverage: tradeParams.leverage,
+                type: 'MARKET',
+                tp: tradeParams.tp,
+                sl: tradeParams.sl,
+                trailingEnabled: tradeParams.trailingEnabled,
+                trailingPercent: tradeParams.trailingPercent,
+                reduceOnly: false
+            });
+            setQuickTrade({ open: false, data: null });
+            // Ideally show success toast here
+        } catch (err) {
+            console.error(err);
+            // Ideally show error toast here
+        }
+    };
+
     const portfolioValue = profile?.balance ? parseFloat(profile.balance) : 0;
     const activePositionsCount = positions.length;
 
     return (
         <Layout>
+            <QuickTradeModal
+                open={quickTrade.open}
+                onClose={() => setQuickTrade({ open: false, data: null })}
+                onConfirm={confirmQuickTrade}
+                signalData={quickTrade.data}
+                balance={portfolioValue}
+            />
             <div className="p-6 md:p-10 max-w-7xl mx-auto">
 
                 {/* Header */}
@@ -166,22 +202,23 @@ const Dashboard = () => {
                         }}
                         balance={profile?.balance ? parseFloat(profile.balance) : 0}
                         currentPrice={currentPrice}
+                        onExecute={handleExecuteSignal}
                     />
                 </div>
 
                 {/* Atlas Bot */}
                 <div className="mb-6">
-                    <AtlasBot currentSymbol={currentSymbol} />
+                    <AtlasBot currentSymbol={currentSymbol} onExecute={handleExecuteSignal} />
                 </div>
 
                 {/* Liquid Venom Bot */}
                 <div className="mb-6">
-                    <LiquidVenomBot currentSymbol={currentSymbol} />
+                    <LiquidVenomBot currentSymbol={currentSymbol} onExecute={handleExecuteSignal} />
                 </div>
 
                 {/* The Obsidian Trap Bot */}
                 <div className="mb-6">
-                    <ObsidianTrapBot currentSymbol={currentSymbol} />
+                    <ObsidianTrapBot currentSymbol={currentSymbol} onExecute={handleExecuteSignal} />
                 </div>
 
                 <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 backdrop-blur-sm h-[400px]">

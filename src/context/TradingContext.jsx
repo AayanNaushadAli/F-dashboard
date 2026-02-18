@@ -18,6 +18,7 @@ export const TradingProvider = ({ children }) => {
 
     const [marketSentiment, setMarketSentiment] = useState(null);
     const [newsSentiment, setNewsSentiment] = useState(null);
+    const [latestNews, setLatestNews] = useState([]);
     const [authLoading, setAuthLoading] = useState(true);
 
     const fetchMarketData = async () => {
@@ -44,19 +45,31 @@ export const TradingProvider = ({ children }) => {
                 let score = 0;
                 let count = 0;
 
-                newsData.Data.slice(0, 50).forEach(article => {
+                // Process articles for both global sentiment and individual display
+                const processedNews = newsData.Data.slice(0, 50).map(article => {
                     const text = `${article.title.toLowerCase()} ${article.body.toLowerCase()}`;
                     let articleScore = 0;
                     positiveWords.forEach(word => { if (text.includes(word)) articleScore++; });
                     negativeWords.forEach(word => { if (text.includes(word)) articleScore--; });
+
                     if (articleScore !== 0) {
                         score += articleScore > 0 ? 1 : -1;
                         count++;
                     }
+
+                    return {
+                        id: article.id,
+                        title: article.title,
+                        source: article.source_info?.name || article.source || 'CryptoNews',
+                        time: article.published_on, // Keep as timestamp for component to format
+                        url: article.url,
+                        sentiment: articleScore > 0 ? 'bullish' : articleScore < 0 ? 'bearish' : 'neutral'
+                    };
                 });
 
                 const normalizedScore = count > 0 ? (score / count).toFixed(2) : 0;
                 setNewsSentiment({ score: normalizedScore, articleCount: newsData.Data.length, analyzedCount: count });
+                setLatestNews(processedNews);
             }
         } catch (error) {
             console.error('Error fetching market data:', error);
@@ -481,6 +494,7 @@ export const TradingProvider = ({ children }) => {
         fetchData,
         marketSentiment,
         newsSentiment,
+        latestNews,
         authLoading
     };
 

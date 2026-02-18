@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Skull, Zap, Droplets, Activity, Crosshair } from 'lucide-react';
 import { fetchKlines, liquidVenomAlpha } from '../utils/liquidVenomLogic';
 
-const LiquidVenomBot = ({ currentSymbol }) => {
+const LiquidVenomBot = ({ currentSymbol, onExecute }) => {
     const [analysis, setAnalysis] = useState(null);
     const [lastUpdate, setLastUpdate] = useState(Date.now());
 
@@ -54,6 +54,20 @@ const LiquidVenomBot = ({ currentSymbol }) => {
                     }`}>
                     {analysis.lethalityIndex}
                 </div>
+                <button
+                    onClick={() => onExecute && analysis.setup?.type && onExecute({
+                        side: analysis.signal === 'BUY' ? 'LONG' : 'SHORT',
+                        entry: analysis.setup.entry,
+                        tp: analysis.setup.tp,
+                        sl: analysis.setup.sl,
+                        leverage: 10, // Venom usually high leverage
+                        trailingEnabled: false
+                    })}
+                    disabled={!analysis.setup?.type}
+                    className="ml-3 flex items-center gap-2 px-3 py-1 bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/30 rounded text-xs font-bold hover:bg-fuchsia-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    ⚡ EXECUTE
+                </button>
             </div>
 
             {/* Main Signal Display */}

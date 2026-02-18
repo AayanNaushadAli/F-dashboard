@@ -3,7 +3,7 @@ import { Brain, Zap, TrendingUp, TrendingDown, AlertTriangle, Target, Send, Mess
 import { analyzeMarket } from '../utils/marketAnalysis';
 import { sendTelegramMessage, getTelegramUpdates } from '../utils/telegram';
 
-const PsychoBot = ({ marketData, balance, currentPrice }) => {
+const PsychoBot = ({ marketData, balance, currentPrice, onExecute }) => {
     const [analysis, setAnalysis] = useState(null);
     const [telegramChatId, setTelegramChatId] = useState(localStorage.getItem('telegram_chat_id'));
     const [isConnecting, setIsConnecting] = useState(false);
@@ -111,24 +111,45 @@ ${analysis.reasons.join('\n')}
                     </div>
                 </div>
 
-                {telegramChatId ? (
+                <div className="flex items-center gap-2">
+                    {/* Execute Button */}
                     <button
-                        onClick={sendUpdate}
-                        disabled={!analysis || analysis.signal === 'WAIT'}
-                        className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50"
-                        title="Send Signal to Telegram"
+                        onClick={() => onExecute && onExecute({
+                            side: analysis.signal.includes('BUY') ? 'LONG' : 'SHORT',
+                            entry: analysis.setup.entry,
+                            tp: analysis.setup.tp,
+                            sl: analysis.setup.sl,
+                            leverage: analysis.leverage,
+                            trailingEnabled: analysis.setup.trailingEnabled,
+                            trailingPercent: analysis.setup.trailingPercent
+                        })}
+                        disabled={!analysis || analysis.signal === 'WAIT' || analysis.signal === 'NO TRADE'}
+                        className="flex items-center gap-2 px-4 py-2 bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded-lg hover:bg-yellow-400/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Quick Execute Trade"
                     >
-                        <Send size={18} />
+                        <Zap size={18} fill="currentColor" />
+                        <span className="font-bold">EXECUTE</span>
                     </button>
-                ) : (
-                    <button
-                        onClick={connectTelegram}
-                        disabled={isConnecting}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors"
-                    >
-                        {isConnecting ? '...' : <><MessageSquare size={14} /> Connect Bot</>}
-                    </button>
-                )}
+
+                    {telegramChatId ? (
+                        <button
+                            onClick={sendUpdate}
+                            disabled={!analysis || analysis.signal === 'WAIT'}
+                            className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+                            title="Send Signal to Telegram"
+                        >
+                            <Send size={18} />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={connectTelegram}
+                            disabled={isConnecting}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors"
+                        >
+                            {isConnecting ? '...' : <><MessageSquare size={14} /> Connect Bot</>}
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 relative z-10">

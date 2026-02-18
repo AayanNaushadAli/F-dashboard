@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Hexagon, Clock, ShieldAlert, Crosshair, Lock } from 'lucide-react';
 import { fetchKlines, analyzeObsidianTrap } from '../utils/obsidianTrapLogic';
 
-const ObsidianTrapBot = ({ currentSymbol }) => {
+const ObsidianTrapBot = ({ currentSymbol, onExecute }) => {
     const [analysis, setAnalysis] = useState(null);
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -54,12 +54,27 @@ const ObsidianTrapBot = ({ currentSymbol }) => {
 
                 {/* Killzone Indicator */}
                 <div className={`flex items-center gap-2 px-3 py-1 rounded border text-xs font-bold tracking-wider ${isKillzone
-                        ? 'bg-cyan-950/30 text-cyan-400 border-cyan-500/50 animate-pulse'
-                        : 'bg-slate-900 text-slate-600 border-slate-800'
+                    ? 'bg-cyan-950/30 text-cyan-400 border-cyan-500/50 animate-pulse'
+                    : 'bg-slate-900 text-slate-600 border-slate-800'
                     }`}>
                     <Clock size={12} />
                     {isKillzone ? 'KILLZONE ACTIVE' : 'DORMANT'}
                 </div>
+                <button
+                    onClick={() => onExecute && analysis.setup?.type && onExecute({
+                        side: analysis.signal.includes('LONG') ? 'LONG' : 'SHORT',
+                        entry: analysis.setup.entry,
+                        tp: analysis.setup.tp,
+                        sl: analysis.setup.sl,
+                        leverage: 20, // Obsidian is high precision
+                        trailingEnabled: true,
+                        trailingPercent: 0.5
+                    })}
+                    disabled={!analysis.signal.includes('EXECUTE')}
+                    className="ml-3 flex items-center gap-2 px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded text-xs font-bold hover:bg-cyan-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    ⚡ EXECUTE
+                </button>
             </div>
 
             {/* Status Display */}

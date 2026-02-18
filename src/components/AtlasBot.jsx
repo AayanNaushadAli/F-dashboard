@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Activity, Terminal, Crosshair, BarChart2 } from 'lucide-react';
 import { analyzeAtlas, fetchOrderBook, fetchKlines, calculateOBI, calculateBollingerBands } from '../utils/atlasLogic';
 
-const AtlasBot = ({ currentSymbol }) => {
+const AtlasBot = ({ currentSymbol, onExecute }) => {
     const [logs, setLogs] = useState([]);
     const [obi, setObi] = useState(0.5);
     const [price, setPrice] = useState(0);
@@ -103,8 +103,25 @@ const AtlasBot = ({ currentSymbol }) => {
                     <h3 className="font-bold text-lg text-slate-100">Atlas Bot</h3>
                     <p className="text-xs text-slate-400">Order Flow Scalper</p>
                 </div>
-                <div className="ml-auto px-3 py-1 bg-slate-800 rounded text-xs font-mono text-cyan-400 border border-cyan-500/30">
-                    {signal}
+                <div className="ml-auto flex items-center gap-3">
+                    <button
+                        onClick={() => onExecute && activeTrade && onExecute({
+                            side: activeTrade.side || (signal.includes('LONG') ? 'LONG' : 'SHORT'),
+                            entry: activeTrade.entry,
+                            tp: activeTrade.tp,
+                            sl: activeTrade.sl,
+                            leverage: activeTrade.leverage || 10,
+                            trailingEnabled: false
+                        })}
+                        disabled={!activeTrade && !signal.includes('TRIGGER')}
+                        className="flex items-center gap-2 px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded text-xs font-bold hover:bg-cyan-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Quick Execute Atlas Signal"
+                    >
+                        ⚡ EXECUTE
+                    </button>
+                    <div className="px-3 py-1 bg-slate-800 rounded text-xs font-mono text-cyan-400 border border-cyan-500/30">
+                        {signal}
+                    </div>
                 </div>
             </div>
 

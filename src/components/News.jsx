@@ -3,45 +3,31 @@ import { Newspaper, Globe, TrendingUp, Clock } from 'lucide-react';
 import { useTrading } from '../context/useTrading';
 
 const News = () => {
-    const { newsSentiment } = useTrading();
+    const { newsSentiment, latestNews } = useTrading();
     const [news, setNews] = useState([]);
 
     useEffect(() => {
-        // In a real app, we would fetch news articles here. 
-        // For now, we simulate a feed or use context if it had articles.
-        // We'll mock some data for display alongside sentiment.
-        const mockNews = [
-            {
-                id: 1,
-                title: "Bitcoin breaks $95k resistance as institutional demand surges",
-                source: "CryptoDaily",
-                time: "10 mins ago",
-                sentiment: "bullish"
-            },
-            {
-                id: 2,
-                title: "SEC approves new Ethereum ETF applications",
-                source: "Bloomberg",
-                time: "1 hour ago",
-                sentiment: "bullish"
-            },
-            {
-                id: 3,
-                title: "Fed signals potential rate hike pause in upcoming meeting",
-                source: "Reuters",
-                time: "2 hours ago",
-                sentiment: "neutral"
-            },
-            {
-                id: 4,
-                title: "Solana network experiences brief congestion, developers investigating",
-                source: "Coindesk",
-                time: "4 hours ago",
-                sentiment: "bearish"
-            }
-        ];
-        setNews(mockNews);
-    }, []);
+        if (latestNews && latestNews.length > 0) {
+            setNews(latestNews);
+        }
+    }, [latestNews]);
+
+    const formatTimeAgo = (timestamp) => {
+        if (!timestamp) return '';
+        const seconds = Math.floor((new Date() - timestamp * 1000) / 1000);
+
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + " years ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + " months ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + " days ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + " hours ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + " mins ago";
+        return Math.floor(seconds) + " seconds ago";
+    };
 
     return (
         <div className="p-6 md:p-10 max-w-7xl mx-auto">
@@ -80,21 +66,31 @@ const News = () => {
 
                 {/* News Feed */}
                 <div className="lg:col-span-2 space-y-4">
-                    {news.map(item => (
-                        <div key={item.id} className="bg-slate-900/30 border border-slate-800 p-5 rounded-xl hover:bg-slate-800/50 transition-colors group cursor-pointer">
-                            <div className="flex justify-between items-start">
-                                <h3 className="text-lg font-bold text-slate-200 group-hover:text-blue-400 transition-colors">{item.title}</h3>
-                                <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${item.sentiment === 'bullish' ? 'bg-emerald-500/20 text-emerald-400' :
+                    {news.length === 0 ? (
+                        <div className="flex justify-center items-center text-slate-500 min-h-[200px] bg-slate-900/30 rounded-xl border border-slate-800">
+                            Loading global newsfeed...
+                        </div>
+                    ) : (
+                        news.map(item => (
+                            <div
+                                key={item.id}
+                                onClick={() => window.open(item.url, '_blank')}
+                                className="bg-slate-900/30 border border-slate-800 p-5 rounded-xl hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                            >
+                                <div className="flex justify-between items-start">
+                                    <h3 className="text-lg font-bold text-slate-200 group-hover:text-blue-400 transition-colors line-clamp-2">{item.title}</h3>
+                                    <span className={`text-xs px-2 py-1 rounded font-bold uppercase shrink-0 ml-2 ${item.sentiment === 'bullish' ? 'bg-emerald-500/20 text-emerald-400' :
                                         item.sentiment === 'bearish' ? 'bg-red-500/20 text-red-400' :
                                             'bg-slate-500/20 text-slate-400'
-                                    }`}>{item.sentiment}</span>
+                                        }`}>{item.sentiment}</span>
+                                </div>
+                                <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
+                                    <span className="flex items-center gap-1"><Globe size={14} /> {item.source}</span>
+                                    <span className="flex items-center gap-1"><Clock size={14} /> {formatTimeAgo(item.time)}</span>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
-                                <span className="flex items-center gap-1"><Globe size={14} /> {item.source}</span>
-                                <span className="flex items-center gap-1"><Clock size={14} /> {item.time}</span>
-                            </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
         </div>
