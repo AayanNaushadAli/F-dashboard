@@ -1,4 +1,4 @@
-const BOT_TOKEN = '8569312257:AAFN22udqGJMLHDtanKMleG3M_irW5gFzQk';
+const BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 
 export const sendTelegramMessage = async (chatId, text) => {
     if (!chatId) {
