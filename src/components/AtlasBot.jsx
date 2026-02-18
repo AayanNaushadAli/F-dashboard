@@ -133,7 +133,7 @@ const AtlasBot = ({ currentSymbol }) => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
                     <span className="text-xs text-slate-500 block">Price</span>
                     <span className="text-sm font-mono text-slate-200">${price}</span>
@@ -169,7 +169,7 @@ const AtlasBot = ({ currentSymbol }) => {
                             <span>LATEST SETUP</span>
                             <span className="text-slate-500">{new Date(lastTradeTime).toLocaleTimeString()}</span>
                         </h4>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <span className="text-xs text-slate-500 block">Entry</span>
                                 <span className="text-sm font-mono text-white">${activeTrade.entry}</span>

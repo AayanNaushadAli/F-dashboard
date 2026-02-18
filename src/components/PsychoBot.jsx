@@ -98,7 +98,7 @@ ${analysis.reasons.join('\n')}
                 )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 relative z-10">
                 <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
                     <span className="text-xs text-slate-400 block mb-1">Signal</span>
                     <div className={`text-xl font-bold ${analysis.color} flex items-center gap-2`}>
@@ -127,7 +127,7 @@ ${analysis.reasons.join('\n')}
                             <span className="text-xs text-slate-400">Waiting for market data...</span>
                         </div>
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <span className="text-xs text-slate-500 block">Entry</span>
                             <span className="text-sm font-mono text-slate-200">${analysis.setup.entry.toLocaleString()}</span>
@@ -144,7 +144,7 @@ ${analysis.reasons.join('\n')}
                             <span className="text-xs text-slate-500 block">Stop Loss</span>
                             <span className="text-sm font-mono text-red-400">${analysis.setup.sl.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                         </div>
-                        <div className="col-span-2 border-t border-slate-700/50 pt-2 flex justify-between items-center">
+                        <div className="sm:col-span-2 border-t border-slate-700/50 pt-2 flex justify-between items-center">
                             <span className="text-xs text-slate-500">Trailing Stop</span>
                             <span className={`text-xs font-bold ${analysis.setup.trailingEnabled ? 'text-blue-400' : 'text-slate-500'}`}>
                                 {analysis.setup.trailingEnabled ? `ON (${analysis.setup.trailingPercent}%)` : 'OFF'}

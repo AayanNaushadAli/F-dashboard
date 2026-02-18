@@ -71,16 +71,16 @@ const Dashboard = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-6">
+        <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-4 md:p-6">
             {/* Header */}
-            <header className="flex justify-between items-center mb-8 pb-4 border-b border-slate-800">
-                <div>
+            <header className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0 mb-6 md:mb-8 pb-4 border-b border-slate-800">
+                <div className="text-center md:text-left">
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
                         PsychoTrade Bot
                     </h1>
                     <p className="text-xs text-slate-400 tracking-wider">v1.2.0 • PRO</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap justify-center gap-3 md:gap-4">
                     <Link to="/market" className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-xs font-medium border border-blue-500/20 hover:bg-blue-500/20 transition-colors">
                         <TrendingUp size={14} />
                         <span>Market</span>
