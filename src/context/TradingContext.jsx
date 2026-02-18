@@ -16,6 +16,7 @@ export const TradingProvider = ({ children }) => {
 
     const [marketSentiment, setMarketSentiment] = useState(null);
     const [newsSentiment, setNewsSentiment] = useState(null);
+    const [authLoading, setAuthLoading] = useState(true);
 
     const fetchMarketData = async () => {
         try {
@@ -93,6 +94,7 @@ export const TradingProvider = ({ children }) => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setUser(session?.user ?? null);
             if (session?.user) fetchData(session.user.id);
+            setAuthLoading(false);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -104,6 +106,7 @@ export const TradingProvider = ({ children }) => {
                 setHistory([]);
                 setPendingOrders([]);
             }
+            setAuthLoading(false);
         });
 
         return () => subscription.unsubscribe();
@@ -419,7 +422,8 @@ export const TradingProvider = ({ children }) => {
         cancelPendingOrder,
         fetchData,
         marketSentiment,
-        newsSentiment
+        newsSentiment,
+        authLoading
     };
 
     return <TradingContext.Provider value={value}>{children}</TradingContext.Provider>;
