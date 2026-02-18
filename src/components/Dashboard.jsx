@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Activity, Brain, Newspaper, Wallet, ArrowUpRight, LogIn, LogOut, User } from 'lucide-react';
 import { useTrading } from '../context/useTrading';
+import PsychoBot from './PsychoBot';
+import AtlasBot from './AtlasBot';
 import { supabase } from '../supabase';
 
 const Dashboard = () => {
-    const { user, profile, history, marketSentiment, newsSentiment } = useTrading();
+    const { user, profile, history, marketSentiment, newsSentiment, currentPrice, currentSymbol } = useTrading();
     const navigate = useNavigate();
     const [timeframe, setTimeframe] = useState('1M');
 
@@ -174,6 +176,25 @@ const Dashboard = () => {
                     </div>
 
                     {/* Chart Section */}
+
+                    {/* PsychoBot AI Analysis */}
+                    <div className="mb-6">
+                        <PsychoBot
+                            marketData={{
+                                fearAndGreed: marketSentiment,
+                                newsSentiment: newsSentiment,
+                                ticker24h: { change: 0 } // Default or passed from context if available
+                            }}
+                            balance={profile?.balance ? parseFloat(profile.balance) : 0}
+                            currentPrice={currentPrice}
+                        />
+                    </div>
+
+                    {/* Atlas Bot */}
+                    <div className="mb-6">
+                        <AtlasBot currentSymbol={currentSymbol} />
+                    </div>
+
                     <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 backdrop-blur-sm h-[400px]">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-lg font-semibold text-slate-200">Portfolio Growth (Equity Curve)</h2>
