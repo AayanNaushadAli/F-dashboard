@@ -8,7 +8,7 @@ import AtlasBot from './AtlasBot';
 import { supabase } from '../supabase';
 
 const Dashboard = () => {
-    const { user, profile, history, marketSentiment, newsSentiment, currentPrice, currentSymbol } = useTrading();
+    const { user, profile, history, positions, marketSentiment, newsSentiment, currentPrice, currentSymbol } = useTrading();
     const navigate = useNavigate();
     const [timeframe, setTimeframe] = useState('1M');
 
@@ -27,6 +27,14 @@ const Dashboard = () => {
         return { dailyPnL, winRate, wins, total };
     }, [history]);
 
+    // Calculate Total Equity (Balance + Used Margin)
+    const currentEquity = useMemo(() => {
+        if (!profile) return 0;
+        const balance = parseFloat(profile.balance) || 0;
+        const usedMargin = positions.reduce((acc, pos) => acc + (parseFloat(pos.margin) || 0), 0);
+        return balance + usedMargin;
+    }, [profile, positions]);
+
     const chartData = useMemo(() => {
         if (!profile || !history) return [];
 
@@ -35,12 +43,14 @@ const Dashboard = () => {
         if (timeframe === '3M') daysCount = 90;
         if (timeframe === 'ALL') daysCount = 365;
 
+        // Generate dates backwards (Today -> Past)
         const days = [];
-        for (let i = daysCount - 1; i >= 0; i--) {
+        for (let i = 0; i < daysCount; i++) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             days.push(d.toISOString().split('T')[0]);
         }
+        // days is now [Today, Yesterday, ...]
 
         const pnlByDay = {};
         history.forEach((trade) => {
@@ -48,22 +58,29 @@ const Dashboard = () => {
             pnlByDay[date] = (pnlByDay[date] || 0) + parseFloat(trade.pnl);
         });
 
-        const startDate = days[0];
-        const preHistory = history.filter((t) => new Date(t.closed_at).toISOString().split('T')[0] < startDate);
-        const prePnL = preHistory.reduce((acc, t) => acc + parseFloat(t.pnl), 0);
+        // Backward calculation:
+        // Start with Current Equity (which includes Fees paid and PnL realized)
+        // To get "Start of Today" (or End of Yesterday), we SUBTRACT today's PnL.
+        // Logic: End_Balance = Start_Balance + PnL  =>  Start_Balance = End_Balance - PnL
 
-        let currentBalance = parseFloat(profile.start_balance || 10000) + prePnL;
+        let runningBalance = currentEquity;
+        const balanceMap = {};
 
-        return days.map((day) => {
-            if (pnlByDay[day]) {
-                currentBalance += pnlByDay[day];
-            }
-            return {
-                day: day.slice(5),
-                balance: parseFloat(currentBalance.toFixed(2))
-            };
+        days.forEach(day => {
+            balanceMap[day] = runningBalance;
+            const dailyPnL = pnlByDay[day] || 0;
+            // Subtract PnL to go back in time
+            // Note: This inherently accounts for fees because 'runningBalance' (Anchor) already has fees deducted.
+            // The historical curve will be shifted down by the fee amount, correctly matching the End Point.
+            runningBalance -= dailyPnL;
         });
-    }, [profile, history, timeframe]);
+
+        // Return reversed array (Oldest -> Newest) for the chart
+        return days.reverse().map((day) => ({
+            day: day.slice(5),
+            balance: parseFloat((balanceMap[day] || 0).toFixed(2))
+        }));
+    }, [profile, history, timeframe, currentEquity]);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -137,7 +154,7 @@ const Dashboard = () => {
                                 Total Balance
                             </div>
                             <div className="text-4xl font-bold text-white mb-1">
-                                ${profile?.balance ? parseFloat(profile.balance).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
+                                ${currentEquity.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </div>
                             <div className="flex items-center gap-1 text-emerald-400 text-sm">
                                 <ArrowUpRight size={16} />

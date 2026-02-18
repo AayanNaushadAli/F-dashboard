@@ -270,6 +270,12 @@ export const TradingProvider = ({ children }) => {
             p_close_percent: pct
         });
         if (error) throw error;
+
+        // Reset the trailing anchor so the remaining position starts fresh
+        if (trailAnchorsRef.current[position.id]) {
+            delete trailAnchorsRef.current[position.id];
+        }
+
         await fetchData(user.id);
     };
 
@@ -293,6 +299,13 @@ export const TradingProvider = ({ children }) => {
             p_trailing_sl_percent: tpct
         });
         if (error) throw error;
+
+        // Reset the trailing anchor so the new settings start from current price (or entry)
+        // avoiding "instant close" if price has retraced from a previous high.
+        if (trailAnchorsRef.current[positionId]) {
+            delete trailAnchorsRef.current[positionId];
+        }
+
         await fetchData(user.id);
     };
 
@@ -315,7 +328,9 @@ export const TradingProvider = ({ children }) => {
                 const price = Number(currentPrice);
 
                 let effectiveSl = sl;
-                if (trailingEnabled && trailingPercent) {
+                if (!trailingEnabled) {
+                    if (trailAnchorsRef.current[pos.id]) delete trailAnchorsRef.current[pos.id];
+                } else if (trailingEnabled && trailingPercent) {
                     const prevAnchor = trailAnchorsRef.current[pos.id] ?? Number(pos.entry_price);
                     const anchor = pos.side === 'LONG' ? Math.max(prevAnchor, price) : Math.min(prevAnchor, price);
                     trailAnchorsRef.current[pos.id] = anchor;
