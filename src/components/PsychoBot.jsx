@@ -9,12 +9,45 @@ const PsychoBot = ({ marketData, balance, currentPrice }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [lastSent, setLastSent] = useState(0);
 
+    const [lockedAnalysis, setLockedAnalysis] = useState(null);
+
     useEffect(() => {
         if (marketData) {
             const result = analyzeMarket(marketData, balance, currentPrice, marketData.symbol || 'BTCUSDT');
-            setAnalysis(result);
+
+            const isBuy = (s) => s && s.includes('BUY');
+            const isSell = (s) => s && s.includes('SELL');
+
+            if (!lockedAnalysis) {
+                // No lock: If valid signal, LOCK IT.
+                if (result.signal !== 'WAIT' && result.signal !== 'NO TRADE') {
+                    setLockedAnalysis(result);
+                }
+                setAnalysis(result);
+            } else {
+                // Currently Locked: Check conditions to unlock or flip
+                const activeSignal = lockedAnalysis.signal;
+                const newSignal = result.signal;
+
+                // 1. Signal Lost? (became WAIT)
+                if (newSignal === 'WAIT' || newSignal === 'NO TRADE') {
+                    setLockedAnalysis(null);
+                    setAnalysis(result);
+                }
+                // 2. Signal Flip? (BUY -> SELL or vice versa)
+                else if ((isBuy(activeSignal) && isSell(newSignal)) || (isSell(activeSignal) && isBuy(newSignal))) {
+                    setLockedAnalysis(result); // Overwrite lock with new direction
+                    setAnalysis(result);
+                }
+                // 3. Same Direction? KEEP LOCKED (Freeze Entry/TP/SL)
+                else {
+                    // We keep 'lockedAnalysis' as the source of truth for the UI
+                    // ensuring entry price doesn't drift.
+                    setAnalysis(lockedAnalysis);
+                }
+            }
         }
-    }, [marketData, balance, currentPrice]);
+    }, [marketData, balance, currentPrice, lockedAnalysis]);
 
     const connectTelegram = async () => {
         setIsConnecting(true);

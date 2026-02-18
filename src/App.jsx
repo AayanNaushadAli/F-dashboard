@@ -3,11 +3,14 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { TradingProvider } from './context/TradingContext';
+import Layout from './components/Layout';
 
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const Market = lazy(() => import('./components/Market'));
 const Login = lazy(() => import('./components/Login'));
 const Profile = lazy(() => import('./components/Profile'));
+const QuantDashboard = lazy(() => import('./components/QuantDashboard'));
+const News = lazy(() => import('./components/News'));
 
 function App() {
   return (
@@ -39,6 +42,24 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/quant"
+                element={
+                  <ProtectedRoute>
+                    <QuantDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/news"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <News />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />
