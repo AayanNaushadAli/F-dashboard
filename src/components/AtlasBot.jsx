@@ -171,6 +171,12 @@ const AtlasBot = ({ currentSymbol }) => {
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
+                                <span className="text-xs text-slate-500 block">Side</span>
+                                <span className={`text-sm font-bold ${activeTrade.side === 'LONG' ? 'text-emerald-400' : activeTrade.side === 'SHORT' ? 'text-red-400' : 'text-slate-400'}`}>
+                                    {activeTrade.side}
+                                </span>
+                            </div>
+                            <div>
                                 <span className="text-xs text-slate-500 block">Entry</span>
                                 <span className="text-sm font-mono text-white">${activeTrade.entry}</span>
                             </div>

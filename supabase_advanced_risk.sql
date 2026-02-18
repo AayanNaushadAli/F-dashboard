@@ -12,7 +12,8 @@ create or replace function public.update_position_risk(
   p_take_profit numeric default null,
   p_stop_loss numeric default null,
   p_trailing_sl_enabled boolean default false,
-  p_trailing_sl_percent numeric default null
+  p_trailing_sl_percent numeric default null,
+  p_tp_variants jsonb default '[]'::jsonb
 )
 returns positions
 language plpgsql
@@ -41,7 +42,8 @@ begin
   set take_profit = p_take_profit,
       stop_loss = p_stop_loss,
       trailing_sl_enabled = p_trailing_sl_enabled,
-      trailing_sl_percent = case when p_trailing_sl_enabled then p_trailing_sl_percent else null end
+      trailing_sl_percent = case when p_trailing_sl_enabled then p_trailing_sl_percent else null end,
+      tp_variants = p_tp_variants
   where id = p_position_id and user_id = p_user_id
   returning * into v_position;
 

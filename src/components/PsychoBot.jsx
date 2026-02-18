@@ -129,6 +129,12 @@ ${analysis.reasons.join('\n')}
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
+                            <span className="text-xs text-slate-500 block">Side</span>
+                            <span className={`text-sm font-bold ${analysis.side === 'LONG' ? 'text-emerald-400' : analysis.side === 'SHORT' ? 'text-red-400' : 'text-slate-400'}`}>
+                                {analysis.side}
+                            </span>
+                        </div>
+                        <div>
                             <span className="text-xs text-slate-500 block">Entry</span>
                             <span className="text-sm font-mono text-slate-200">${analysis.setup.entry.toLocaleString()}</span>
                         </div>

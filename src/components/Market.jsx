@@ -113,7 +113,8 @@ const Market = () => {
     tp: pos.take_profit ? String(pos.take_profit) : '',
     sl: pos.stop_loss ? String(pos.stop_loss) : '',
     trailingEnabled: Boolean(pos.trailing_sl_enabled),
-    trailingPercent: pos.trailing_sl_percent ? String(pos.trailing_sl_percent) : '1'
+    trailingPercent: pos.trailing_sl_percent ? String(pos.trailing_sl_percent) : '1',
+    tpVariants: pos.tp_variants || []
   };
 
   const onRiskDraftChange = (posId, patch) => {
@@ -135,7 +136,8 @@ const Market = () => {
       takeProfit: draft.tp ? Number(draft.tp) : null,
       stopLoss: draft.sl ? Number(draft.sl) : null,
       trailingEnabled: draft.trailingEnabled,
-      trailingPercent: draft.trailingEnabled ? Number(draft.trailingPercent) : null
+      trailingPercent: draft.trailingEnabled ? Number(draft.trailingPercent) : null,
+      tpVariants: draft.tpVariants
     });
     setTicket((t) => ({ ...t, open: false, position: null }));
     setRiskModal({ open: false, position: null });
@@ -418,20 +420,79 @@ const Market = () => {
 
               {ticket.tab === 'risk' && (
                 <div className="space-y-3">
-                  <input
-                    type="number"
-                    placeholder="Take Profit"
-                    value={getRiskDraft(ticket.position).tp}
-                    onChange={(e) => onRiskDraftChange(ticket.position.id, { tp: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Stop Loss"
-                    value={getRiskDraft(ticket.position).sl}
-                    onChange={(e) => onRiskDraftChange(ticket.position.id, { sl: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
-                  />
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400 block">Take Profit Levels (TP1, TP2...)</label>
+                    {(getRiskDraft(ticket.position).tpVariants || []).map((v, i) => (
+                      <div key={i} className="flex gap-2 mb-2 items-center">
+                        <div className="flex-1">
+                          <label className="text-[10px] text-slate-500">Price</label>
+                          <input
+                            type="number"
+                            value={v.price}
+                            onChange={(e) => {
+                              const newVariants = [...(getRiskDraft(ticket.position).tpVariants || [])];
+                              newVariants[i].price = e.target.value;
+                              onRiskDraftChange(ticket.position.id, { tpVariants: newVariants });
+                            }}
+                            className={`w-full bg-slate-950 border ${v.executed ? 'border-emerald-500/50 text-emerald-400' : 'border-slate-700'} rounded px-2 py-1 text-xs`}
+                            placeholder="Price"
+                            disabled={v.executed}
+                          />
+                        </div>
+                        <div className="w-20">
+                          <label className="text-[10px] text-slate-500">% Close</label>
+                          <input
+                            type="number"
+                            value={v.percent}
+                            onChange={(e) => {
+                              const newVariants = [...(getRiskDraft(ticket.position).tpVariants || [])];
+                              newVariants[i].percent = e.target.value;
+                              onRiskDraftChange(ticket.position.id, { tpVariants: newVariants });
+                            }}
+                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs"
+                            placeholder="%"
+                            disabled={v.executed}
+                          />
+                        </div>
+                        {!v.executed && (
+                          <button
+                            onClick={() => {
+                              const newVariants = [...(getRiskDraft(ticket.position).tpVariants || [])];
+                              newVariants.splice(i, 1);
+                              onRiskDraftChange(ticket.position.id, { tpVariants: newVariants });
+                            }}
+                            className="mt-4 text-red-500 hover:text-red-400 px-2"
+                          >
+                            ✕
+                          </button>
+                        )}
+                        {v.executed && <span className="mt-4 text-emerald-500 text-[10px]">✓</span>}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        const current = getRiskDraft(ticket.position).tpVariants || [];
+                        if (current.length < 5) {
+                          onRiskDraftChange(ticket.position.id, { tpVariants: [...current, { price: '', percent: '50', executed: false }] });
+                        }
+                      }}
+                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                    >
+                      + Add Take Profit Level
+                    </button>
+                  </div>
+
+                  <div className="border-t border-slate-800 pt-2">
+                    <label className="text-xs text-slate-400 block mb-1">Main Stop Loss</label>
+                    <input
+                      type="number"
+                      placeholder="Stop Loss"
+                      value={getRiskDraft(ticket.position).sl}
+                      onChange={(e) => onRiskDraftChange(ticket.position.id, { sl: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+
                   <label className="flex items-center gap-2 text-sm text-slate-300">
                     <input
                       type="checkbox"

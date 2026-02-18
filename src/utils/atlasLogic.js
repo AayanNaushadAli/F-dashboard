@@ -104,6 +104,7 @@ export const analyzeAtlas = async (symbol) => {
             setup.entry = currentPrice;
             setup.tp = currentPrice * (1 + tpPercent);
             setup.sl = currentPrice * (1 - slPercent);
+            setup.side = 'LONG';
         }
         // Short: OBI < 0.35 AND Price >= Upper BB
         else if (obi < 0.35 && currentPrice >= bb.upper) {
@@ -114,6 +115,7 @@ export const analyzeAtlas = async (symbol) => {
             setup.entry = currentPrice;
             setup.tp = currentPrice * (1 - tpPercent);
             setup.sl = currentPrice * (1 + slPercent);
+            setup.side = 'SHORT';
         }
         // Debugging / Near Misses
         else if (obi < 0.40 && currentPrice >= bb.upper * 0.999) {

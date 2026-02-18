@@ -279,7 +279,7 @@ export const TradingProvider = ({ children }) => {
         await fetchData(user.id);
     };
 
-    const updatePositionRisk = async (positionId, { takeProfit, stopLoss, trailingEnabled, trailingPercent }) => {
+    const updatePositionRisk = async (positionId, { takeProfit, stopLoss, trailingEnabled, trailingPercent, tpVariants }) => {
         if (!user) return;
         const tp = takeProfit ? Number(takeProfit) : null;
         const sl = stopLoss ? Number(stopLoss) : null;
@@ -296,7 +296,8 @@ export const TradingProvider = ({ children }) => {
             p_take_profit: tp,
             p_stop_loss: sl,
             p_trailing_sl_enabled: te,
-            p_trailing_sl_percent: tpct
+            p_trailing_sl_percent: tpct,
+            p_tp_variants: tpVariants || []
         });
         if (error) throw error;
 
@@ -341,6 +342,32 @@ export const TradingProvider = ({ children }) => {
 
                     if (effectiveSl == null) effectiveSl = trailStop;
                     else effectiveSl = pos.side === 'LONG' ? Math.max(effectiveSl, trailStop) : Math.min(effectiveSl, trailStop);
+                }
+
+                // Check Multiple TPs
+                if (pos.tp_variants && Array.isArray(pos.tp_variants)) {
+                    for (let i = 0; i < pos.tp_variants.length; i++) {
+                        const variant = pos.tp_variants[i];
+                        if (variant.executed) continue;
+
+                        const vPrice = Number(variant.price);
+                        if ((pos.side === 'LONG' && price >= vPrice) || (pos.side === 'SHORT' && price <= vPrice)) {
+                            // Trigger Partial Close
+                            const closePct = Number(variant.percent);
+                            await supabase.rpc('close_position_partial_tx', {
+                                p_user_id: user.id,
+                                p_position_id: pos.id,
+                                p_exit_price: price,
+                                p_close_percent: closePct
+                            });
+
+                            // Update local variants to mark as executed
+                            const newVariants = [...pos.tp_variants];
+                            newVariants[i].executed = true;
+
+                            await supabase.from('positions').update({ tp_variants: newVariants }).eq('id', pos.id);
+                        }
+                    }
                 }
 
                 let hit = false;

@@ -5,6 +5,9 @@ import { TrendingUp, Activity, Brain, Newspaper, Wallet, ArrowUpRight, LogIn, Lo
 import { useTrading } from '../context/useTrading';
 import PsychoBot from './PsychoBot';
 import AtlasBot from './AtlasBot';
+import LiquidVenomBot from './LiquidVenomBot';
+import ObsidianTrapBot from './ObsidianTrapBot';
+import KillzoneStatus from './KillzoneStatus';
 import { supabase } from '../supabase';
 
 const Dashboard = () => {
@@ -86,113 +89,102 @@ const Dashboard = () => {
         await supabase.auth.signOut();
         navigate('/login');
     };
+    const portfolioValue = profile?.balance ? parseFloat(profile.balance) : 0;
+    const activePositionsCount = positions.length;
 
     return (
-        <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-4 md:p-6">
-            {/* Header */}
-            <header className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0 mb-6 md:mb-8 pb-4 border-b border-slate-800">
-                <div className="text-center md:text-left">
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                        PsychoTrade Bot
-                    </h1>
-                    <p className="text-xs text-slate-400 tracking-wider">v1.2.0 • PRO</p>
+        <div className="flex bg-black min-h-screen text-slate-200 font-sans selection:bg-cyan-500/30">
+            {/* Sidebar (simplified for mobile) */}
+            <div className="w-16 md:w-20 flex flex-col items-center py-6 border-r border-slate-900 bg-black z-20 shrink-0">
+                <div className="mb-8 p-3 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl shadow-lg shadow-indigo-500/20">
+                    <Brain className="text-white" size={24} />
                 </div>
-                <div className="flex flex-wrap justify-center gap-3 md:gap-4">
-                    <Link to="/market" className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-xs font-medium border border-blue-500/20 hover:bg-blue-500/20 transition-colors">
-                        <TrendingUp size={14} />
-                        <span>Market</span>
-                    </Link>
+                <nav className="flex-1 flex flex-col gap-6 w-full items-center">
+                    <button className="p-3 bg-slate-800 rounded-xl text-cyan-400 shadow-inner shadow-cyan-500/10"><Activity size={20} /></button>
+                    <Link to="/market" className="p-3 text-slate-500 hover:text-slate-300 hover:bg-slate-900 rounded-xl transition-all"><TrendingUp size={20} /></Link>
+                    <button className="p-3 text-slate-500 hover:text-slate-300 hover:bg-slate-900 rounded-xl transition-all"><Wallet size={20} /></button>
+                    <button className="p-3 text-slate-500 hover:text-slate-300 hover:bg-slate-900 rounded-xl transition-all"><Newspaper size={20} /></button>
+                    <div className="h-px w-8 bg-slate-900 my-2"></div>
+                </nav>
+                <div className="mt-auto flex flex-col gap-4">
+                    <button onClick={() => supabase.auth.signOut()} className="p-3 text-slate-500 hover:text-red-400 transition-colors">
+                        <LogOut size={20} />
+                    </button>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-600 ring-2 ring-black"></div>
+                </div>
+            </div>
 
-                    {user ? (
-                        <>
-                            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full text-xs font-medium border border-emerald-500/20">
+            {/* Main Content */}
+            <div className="flex-1 overflow-x-hidden relative">
+                <div className="p-6 md:p-10 max-w-7xl mx-auto">
+
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
+                        <div>
+                            <h1 className="text-3xl font-black tracking-tighter text-white mb-2">
+                                COMMAND <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">CENTER</span>
+                            </h1>
+                            <p className="text-slate-500 font-medium flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Live Connection</span>
-                            </div>
-                            <div className="flex items-center gap-3 pl-4 border-l border-slate-700">
-                                <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                                    <div className="text-right hidden sm:block">
-                                        <div className="text-xs text-slate-400">Trader</div>
-                                        <div className="text-xs font-bold text-slate-200">
-                                            {profile?.full_name || user.email.split('@')[0]}
-                                        </div>
-                                    </div>
-                                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600">
-                                        <User size={16} className="text-slate-300" />
-                                    </div>
-                                </Link>
-                                <button
-                                    onClick={handleLogout}
-                                    className="p-2 text-slate-400 hover:text-red-400 transition-colors"
-                                    title="Logout"
-                                >
-                                    <LogOut size={18} />
-                                </button>
-                            </div>
-                        </>
-                    ) : (
-                        <Link to="/login" className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold transition-colors">
-                            <LogIn size={16} />
-                            Login
-                        </Link>
-                    )}
-                </div>
-            </header>
-
-            {/* Main Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                {/* Left Column: Stats & Chart */}
-                <div className="lg:col-span-2 space-y-6">
-
-                    {/* Hero Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Total Balance */}
-                        <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 text-slate-400 text-sm font-medium">
-                                <Wallet size={16} />
-                                Total Balance
-                            </div>
-                            <div className="text-4xl font-bold text-white mb-1">
-                                ${currentEquity.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </div>
-                            <div className="flex items-center gap-1 text-emerald-400 text-sm">
-                                <ArrowUpRight size={16} />
-                                <span>+0.0%</span>
-                                <span className="text-slate-500 ml-1">all time</span>
-                            </div>
+                                System Operational • v2.4.0
+                            </p>
                         </div>
-
-                        {/* Daily P&L */}
-                        <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 text-slate-400 text-sm font-medium">
-                                <TrendingUp size={16} />
-                                Daily P&L
-                            </div>
-                            <div className={`text-2xl font-bold mb-1 ${stats.dailyPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {stats.dailyPnL >= 0 ? '+' : ''}${stats.dailyPnL.toFixed(2)}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                                Today's realized profit
-                            </div>
-                        </div>
-
-                        {/* Win Rate */}
-                        <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 text-slate-400 text-sm font-medium">
-                                <Activity size={16} />
-                                Win Rate
-                            </div>
-                            <div className="text-2xl font-bold text-blue-400 mb-1">
-                                {stats.winRate}%
-                            </div>
-                            <div className="text-xs text-slate-500">
-                                {stats.wins} wins / {stats.total} trades
-                            </div>
+                        <div className="flex items-center gap-4">
+                            <Link to="/market" className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center gap-2 shadow-lg shadow-white/5">
+                                <TrendingUp size={18} />
+                                Launch Terminal
+                            </Link>
                         </div>
                     </div>
 
-                    {/* Chart Section */}
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                        {/* Killzone Status - New Addition */}
+                        <KillzoneStatus />
+
+                        {/* Portfolio Card */}
+                        <div className="p-5 bg-slate-900/50 rounded-2xl border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Wallet size={48} />
+                            </div>
+                            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Balance</div>
+                            <div className="text-2xl font-mono font-bold text-white mb-2">
+                                ${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </div>
+                            <div className={`text-xs font-medium flex items-center gap-1 ${stats.dailyPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {stats.dailyPnL >= 0 ? '+' : ''}{stats.dailyPnL.toFixed(2)} Today
+                            </div>
+                        </div>
+
+                        {/* Win Rate Card */}
+                        <div className="p-5 bg-slate-900/50 rounded-2xl border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Activity size={48} />
+                            </div>
+                            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Win Rate (24h)</div>
+                            <div className="text-2xl font-mono font-bold text-white mb-2">
+                                {stats.winRate}%
+                            </div>
+                            <div className="text-xs text-slate-500 font-medium">
+                                {stats.wins} / {stats.total} Trades
+                            </div>
+                        </div>
+
+                        {/* Active Positions */}
+                        <div className="p-5 bg-slate-900/50 rounded-2xl border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <ArrowUpRight size={48} />
+                            </div>
+                            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Active Positions</div>
+                            <div className="text-2xl font-mono font-bold text-white mb-2">
+                                {activePositionsCount}
+                            </div>
+                            <div className="text-xs text-slate-500 font-medium flex items-center gap-2">
+                                <span className={`w-1.5 h-1.5 rounded-full ${activePositionsCount > 0 ? 'bg-emerald-500' : 'bg-slate-600'}`}></span>
+                                {activePositionsCount > 0 ? 'Exposure Active' : 'No Exposure'}
+                            </div>
+                        </div>
+                    </div>{/* Chart Section */}
 
                     {/* PsychoBot AI Analysis */}
                     <div className="mb-6">
@@ -210,6 +202,16 @@ const Dashboard = () => {
                     {/* Atlas Bot */}
                     <div className="mb-6">
                         <AtlasBot currentSymbol={currentSymbol} />
+                    </div>
+
+                    {/* Liquid Venom Bot */}
+                    <div className="mb-6">
+                        <LiquidVenomBot currentSymbol={currentSymbol} />
+                    </div>
+
+                    {/* The Obsidian Trap Bot */}
+                    <div className="mb-6">
+                        <ObsidianTrapBot currentSymbol={currentSymbol} />
                     </div>
 
                     <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 backdrop-blur-sm h-[400px]">

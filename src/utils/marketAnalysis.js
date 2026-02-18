@@ -152,6 +152,7 @@ export const analyzeMarket = (data, balance = 0, currentPrice = 0, currentSymbol
         riskLevel,
         reasons,
         color,
+        side: signal.includes('BUY') ? 'LONG' : signal.includes('SELL') ? 'SHORT' : '-',
         setup
     };
 };
