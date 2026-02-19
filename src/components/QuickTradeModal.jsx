@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Zap, AlertTriangle } from 'lucide-react';
+import { X, Zap, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 
 const QuickTradeModal = ({ open, onClose, onConfirm, signalData, balance }) => {
     const [amount, setAmount] = useState('1000');
@@ -38,6 +38,23 @@ const QuickTradeModal = ({ open, onClose, onConfirm, signalData, balance }) => {
     const colorClass = isLong ? 'text-emerald-400' : 'text-red-400';
     const bgClass = isLong ? 'bg-emerald-500' : 'bg-red-500';
 
+    // Calculation Logic
+    const margin = parseFloat(amount) || 0;
+    const lev = parseFloat(leverage) || 1;
+    const positionSize = margin * lev;
+    const entry = signalData.entry || 0;
+    const tp = signalData.tp || 0;
+    const sl = signalData.sl || 0;
+
+    // Quantity (Coins) = Position Size / Entry Price
+    const quantity = entry > 0 ? positionSize / entry : 0;
+
+    // Projected PnL
+    const projectedProfit = entry > 0 ? Math.abs(tp - entry) * quantity : 0;
+    const projectedLoss = entry > 0 ? Math.abs(sl - entry) * quantity : 0;
+
+    const riskReward = projectedLoss > 0 ? (projectedProfit / projectedLoss).toFixed(2) : '∞';
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -70,7 +87,7 @@ const QuickTradeModal = ({ open, onClose, onConfirm, signalData, balance }) => {
                     {/* Inputs */}
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-xs text-slate-400 mb-1.5 ml-1">Position Size (USDT)</label>
+                            <label className="block text-xs text-slate-400 mb-1.5 ml-1">Margin (USDT)</label>
                             <input
                                 type="number"
                                 value={amount}
@@ -80,7 +97,7 @@ const QuickTradeModal = ({ open, onClose, onConfirm, signalData, balance }) => {
                             />
                             <div className="flex justify-between text-xs mt-1.5 px-1">
                                 <span className="text-slate-500">Available: ${balance.toLocaleString()}</span>
-                                <span className="text-slate-500">Max Lev: {signalData.leverage}x Rec.</span>
+                                <span className="text-slate-500">Pos Size: <span className="text-white">${positionSize.toLocaleString()}</span></span>
                             </div>
                         </div>
 
@@ -101,6 +118,29 @@ const QuickTradeModal = ({ open, onClose, onConfirm, signalData, balance }) => {
                                 ))}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Projected PnL Card */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg">
+                            <span className="text-[10px] text-emerald-400 uppercase font-bold flex items-center gap-1">
+                                <TrendingUp size={12} /> Proj. Profit
+                            </span>
+                            <div className="text-lg font-mono text-emerald-300">
+                                +${projectedProfit.toFixed(2)}
+                            </div>
+                        </div>
+                        <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
+                            <span className="text-[10px] text-red-400 uppercase font-bold flex items-center gap-1">
+                                <TrendingDown size={12} /> Proj. Loss
+                            </span>
+                            <div className="text-lg font-mono text-red-300">
+                                -${projectedLoss.toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="text-center text-[10px] text-slate-500 -mt-2">
+                        Risk/Reward: <span className="text-slate-300">1:{riskReward}</span>
                     </div>
 
                     {error && (

@@ -224,7 +224,7 @@ const Market = () => {
                       <th className="px-4 py-2">Symbol</th>
                       <th className="px-4 py-2">Entry</th>
                       <th className="px-4 py-2 hidden sm:table-cell">Mark</th>
-                      <th className="px-4 py-2 hidden sm:table-cell">Risk Controls</th>
+                      <th className="px-4 py-2 hidden sm:table-cell">Size</th>
                       <th className="px-4 py-2">PnL</th>
                       <th className="px-4 py-2 text-right">Actions</th>
                     </tr>
@@ -240,12 +240,9 @@ const Market = () => {
                           </td>
                           <td className="px-4 py-3 font-mono">${Number(pos.entry_price).toLocaleString()}</td>
                           <td className="px-4 py-3 font-mono hidden sm:table-cell">${Number(currentPrice).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-slate-300 text-[11px] hidden sm:table-cell">
-                            TP: {pos.take_profit ? Number(pos.take_profit).toFixed(2) : '-'}
-                            <br />
-                            SL: {pos.stop_loss ? Number(pos.stop_loss).toFixed(2) : '-'}
-                            <br />
-                            Trail: {pos.trailing_sl_enabled ? `${Number(pos.trailing_sl_percent || 0).toFixed(2)}%` : 'Off'}
+                          <td className="px-4 py-3 text-slate-300 text-xs hidden sm:table-cell font-mono">
+                            <div className="text-white">${(pos.margin * pos.leverage).toLocaleString()}</div>
+                            <div className="text-slate-500 text-[10px]">(${Number(pos.margin).toLocaleString()})</div>
                           </td>
                           <td className="px-4 py-3 font-mono">
                             <span className={pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}</span>
@@ -422,7 +419,16 @@ const Market = () => {
                 {ticket.tab === 'risk' && (
                   <div className="space-y-3">
                     <div className="space-y-2">
-                      <label className="text-xs text-slate-400 block">Take Profit Levels (TP1, TP2...)</label>
+                      <label className="text-xs text-slate-400 block mb-1">Main Take Profit</label>
+                      <input
+                        type="number"
+                        placeholder="Take Profit"
+                        value={getRiskDraft(ticket.position).tp}
+                        onChange={(e) => onRiskDraftChange(ticket.position.id, { tp: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm mb-4"
+                      />
+
+                      <label className="text-xs text-slate-400 block">Multiple Take Profit Levels (Partial Exits)</label>
                       {(getRiskDraft(ticket.position).tpVariants || []).map((v, i) => (
                         <div key={i} className="flex gap-2 mb-2 items-center">
                           <div className="flex-1">
