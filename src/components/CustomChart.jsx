@@ -38,7 +38,7 @@ const CustomChart = () => {
                 </div>
             </div>
 
-            <div className="flex-1 w-full min-h-0">
+            <div className="flex-1 w-full min-h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <defs>

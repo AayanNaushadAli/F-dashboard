@@ -8,13 +8,28 @@ const LiquidVenomBot = ({ currentSymbol, onExecute }) => {
 
     useEffect(() => {
         const runAnalysis = async () => {
-            if (!currentSymbol) return;
-            const candles = await fetchKlines(currentSymbol);
-            if (candles.length > 0) {
-                const currentPrice = candles[candles.length - 1].close;
-                const result = liquidVenomAlpha(candles, currentPrice);
-                setAnalysis(result);
-                setLastUpdate(Date.now());
+            if (!currentSymbol) {
+                console.warn("Liquid Venom: No Symbol Selected");
+                return;
+            }
+
+            console.log(`🔍 Scanning ${currentSymbol}...`); // DEBUG LOG 1
+
+            try {
+                const candles = await fetchKlines(currentSymbol);
+                console.log(`📊 Candles fetched: ${candles ? candles.length : 0}`); // DEBUG LOG 2
+
+                if (candles && candles.length > 0) {
+                    const currentPrice = candles[candles.length - 1].close;
+                    const result = liquidVenomAlpha(candles, currentPrice);
+
+                    console.log("🤖 Bot Result:", result); // DEBUG LOG 3
+
+                    setAnalysis(result);
+                    setLastUpdate(Date.now());
+                }
+            } catch (error) {
+                console.error("❌ Critical Error fetching data:", error);
             }
         };
 

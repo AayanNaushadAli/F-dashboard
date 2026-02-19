@@ -1,19 +1,25 @@
-export const fetchKlines = async (symbol) => {
+export const fetchKlines = async (symbol = 'BTCUSDT', interval = '15m') => {
     try {
-        // Fetch 50 candles (enough for lookback of 20-30)
-        const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=50`);
+        // Fetch 50 candles to ensure we have enough for the lookback
+        const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=50`);
         const data = await response.json();
-        // Map to { high, low, close, open, volume }
-        return data.map(k => ({
-            time: k[0],
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5])
+
+        // Format for the bot
+        if (!Array.isArray(data)) {
+            console.error("Binance API returned invalid data:", data);
+            return [];
+        }
+
+        return data.map(d => ({
+            open: parseFloat(d[1]),
+            high: parseFloat(d[2]),
+            low: parseFloat(d[3]),
+            close: parseFloat(d[4]),
+            volume: parseFloat(d[5]),
+            time: d[0]
         }));
     } catch (error) {
-        console.error('Liquid Venom: Error fetching klines', error);
+        console.error("Binance API Error:", error);
         return [];
     }
 };

@@ -153,7 +153,13 @@ export const TradingProvider = ({ children }) => {
                 });
             }
         };
-        return () => { if (ws.current) ws.current.close(); };
+
+        return () => {
+            if (ws.current) {
+                ws.current.close();
+                console.log('🛑 WebSocket Disconnected cleanly');
+            }
+        };
     }, [currentSymbol]);
 
     const placeOrder = async (order) => {
